@@ -1,27 +1,25 @@
-#include <sfml_bindings.h>
+#include <sim.h>
 
-#define WINDOW_WIDTH 800
-#define WINDOW_HEIGHT 400
-#define MAP_WIDTH 200
-#define MAP_HEIGHT 100
+#define MAP_WIDTH SIM_SCREEN_WIDTH
+#define MAP_HEIGHT SIM_SCREEN_HEIGHT
 
-#define BACKGROUND_COLOR SF_COLOR(128, 128, 128, 255)
-#define PIXEL_SHAPE SF_CIRCLE_SHAPE
+#define BACKGROUND_COLOR SIM_RGB(128, 128, 128)
+#define PIXEL_SHAPE SIM_CIRCLE_SHAPE
 #define INITIAL_DENSITY_RATIO 5
 
 #define ENABLE_STATIC_MODE 0
 
 // clang-format off
-sf_color_t color_scheme[9] = {
-  SF_COLOR(240, 223, 36, 255),
-  SF_COLOR(98, 240, 36, 255),
-  SF_COLOR(36, 240, 214, 255),
-  SF_COLOR(36, 194, 240, 255),
-  SF_COLOR(36, 50, 240, 255),
-  SF_COLOR(194, 236, 240, 255),
-  SF_COLOR(240, 36, 28, 255),
-  SF_COLOR(240, 60, 36, 255),
-  SF_COLOR(240, 122, 36, 255),
+sim_color_t color_scheme[9] = {
+  SIM_RGB(240, 223, 36),
+  SIM_RGB(98, 240, 36),
+  SIM_RGB(36, 240, 214),
+  SIM_RGB(36, 194, 240),
+  SIM_RGB(36, 50, 240),
+  SIM_RGB(194, 236, 240),
+  SIM_RGB(240, 36, 28),
+  SIM_RGB(240, 60, 36),
+  SIM_RGB(240, 122, 36),
 };
 // clang-format on
 
@@ -38,7 +36,7 @@ void draw_map() {
   for (int i = 0; i < MAP_HEIGHT; ++i)
     for (int j = 0; j < MAP_WIDTH; ++j)
       if (map[i][j])
-        sf_draw_pixel(j, i, color_scheme[neighbour_count[i][j]], PIXEL_SHAPE);
+        sim_set_pixel(j, i, color_scheme[neighbour_count[i][j]], PIXEL_SHAPE);
 }
 
 void update_neighbour_count() {
@@ -73,11 +71,10 @@ void update_map() {
 
 int main() {
   init_map();
-  sf_init_window(WINDOW_WIDTH, WINDOW_HEIGHT, MAP_WIDTH, MAP_HEIGHT);
-  while (sf_handle_events()) {
-    sf_clear(BACKGROUND_COLOR);
+  while (1) {
+    sim_clear(BACKGROUND_COLOR);
     draw_map();
-    sf_display();
+    sim_display();
 #if !ENABLE_STATIC_MODE
     update_map();
 #endif
