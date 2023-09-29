@@ -8,7 +8,7 @@
 ```bash
 mkdir build && cd build
 cmake ..
-# On MacOS path to SFML installation be needed:
+# On MacOS path to SFML installation may be needed:
 # cmake .. -DSFML_DIR=/usr/local/lib/cmake/SFML
 make
 ```
