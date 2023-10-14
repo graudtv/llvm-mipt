@@ -42,3 +42,9 @@ void sim_display() {
   Window.display();
   handle_events();
 }
+
+int sim_rand() {
+  /* https://stackoverflow.com/a/3062783 */
+  static int seed = 123456789;
+  return seed = (1103515245 * seed + 12345) % (1 << 31);
+}

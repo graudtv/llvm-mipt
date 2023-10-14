@@ -24,6 +24,8 @@ void sim_clear(sim_color_t color);
 void sim_set_pixel(unsigned x, unsigned y, sim_color_t color, enum sim_shape_t shape);
 /* Swap buffers */
 void sim_display();
+/* Get random int */
+int sim_rand();
 
 #ifdef __cplusplus
 }
