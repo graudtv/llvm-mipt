@@ -7,6 +7,8 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/Pass.h>
 #include <llvm/Support/raw_ostream.h>
+#include <utility>
+#include <vector>
 
 using namespace llvm;
 
@@ -50,42 +52,24 @@ public:
   virtual bool runOnFunction(Function &F) {
     FunctionCallee TraceFunc = getTraceFunc(*F.getParent());
     IRBuilder<> Builder(F.getParent()->getContext());
-    Type *VoidTy = Builder.getVoidTy();
+    /* Insertion place -> string to dump */
+    std::vector<std::pair<Instruction *, std::string>> TraceCalls;
 
-    /* Explicitly set names to instructions */
-    int Id = 0;
+    /* To preserve original names of BBs and values, first gather
+     * information without modifying IR */
     for (auto &BB : F) {
-      BB.setName(std::to_string(Id++));
-      for (auto &I : BB)
-        if (I.getType() != VoidTy)
-          I.setName(std::to_string(Id++));
-    }
-
-    for (auto &BB : F)
-      for (auto &I : BB) {
-        if (isa<PHINode>(I))
-          continue;
-
-        Builder.SetInsertPoint(&I);
-
-        /* Trace function exits */
-        if (isa<ReturnInst>(I))
-          Builder.CreateCall(
-              TraceFunc, Builder.CreateGlobalStringPtr(
-                             ("; end function '" + F.getName() + "'").str()));
-        /* Trace each instruction */
-        Value *Instr = Builder.CreateGlobalStringPtr(toString(I));
-        Builder.CreateCall(TraceFunc, {Instr});
-      }
-
-    /* Trace BB entrances */
-    for (auto &BB : F) {
-      auto Label = getLabel(BB);
+      /* Trace BB entrances */
       auto It = find_if(BB, [](auto &I) { return !isa<PHINode>(I); });
-      Builder.SetInsertPoint(&*It);
-      Builder.CreateCall(TraceFunc, Builder.CreateGlobalStringPtr(
-                                        "; function '" + F.getName().str() +
-                                        "' BB '" + Label + "'"));
+      TraceCalls.emplace_back(&*It, "; function '" + F.getName().str() +
+                                        "' BB '" + getLabel(BB) + "'");
+
+      /* Trace each instruction */
+      for (auto &I : BB) {
+        auto It = std::find_if(I.getIterator(), BB.end(), [](auto &Instr) {
+          return !isa<PHINode>(Instr);
+        });
+        TraceCalls.emplace_back(&*It, toString(I));
+      }
     }
 
     /* Trace function entrances */
@@ -93,6 +77,23 @@ public:
     Builder.CreateCall(TraceFunc,
                        Builder.CreateGlobalStringPtr(
                            ("; begin function '" + F.getName() + "'").str()));
+
+    /* Insert prepared calls */
+    for (auto &I : TraceCalls) {
+      Builder.SetInsertPoint(I.first);
+      Builder.CreateCall(TraceFunc, Builder.CreateGlobalStringPtr(I.second));
+    }
+
+    /* Trace function exits */
+    for (auto &BB : F) {
+      auto &I = BB.back();
+      if (isa<ReturnInst>(I)) {
+        Builder.SetInsertPoint(&I);
+        Builder.CreateCall(TraceFunc,
+                           Builder.CreateGlobalStringPtr(
+                               ("; end function '" + F.getName() + "'").str()));
+      }
+    }
 
     verifyFunction(F, &errs());
     return true;
