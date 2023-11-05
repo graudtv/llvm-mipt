@@ -10,8 +10,8 @@
 #define ENABLE_STATIC_MODE 0
 
 typedef struct {
-  unsigned char is_alive[MAP_WIDTH][MAP_HEIGHT];
-  unsigned char neighbour_count[MAP_WIDTH][MAP_HEIGHT];
+  unsigned char is_alive[MAP_HEIGHT][MAP_WIDTH];
+  unsigned char neighbour_count[MAP_HEIGHT][MAP_WIDTH];
 } map_t;
 
 void draw_map(const map_t *m) {
