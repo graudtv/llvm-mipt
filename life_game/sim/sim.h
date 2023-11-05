@@ -9,8 +9,8 @@ extern "C" {
 
 typedef unsigned sim_color_t;
 
-#define SIM_RGBA(r, g, b, a) ((r) << 24 | (g) << 16 | (b) << 8 | (a))
-#define SIM_RGB(r, g, b) SIM_RGBA(r, g, b, 255)
+#define SIM_RGBA(r, g, b, a) ((sim_color_t) ((r) << 24 | (g) << 16 | (b) << 8 | (a)))
+#define SIM_RGB(r, g, b) ((sim_color_t) SIM_RGBA(r, g, b, 255))
 
 enum sim_shape_t {
   SIM_TRIANGLE_SHAPE = 3,
