@@ -7,7 +7,7 @@ purposes
 
 Features:
 * 32 general purpose registers
-* Up to 48 different instruction in the base encoding
+* 25 instructions
 
 ### List of instructions
 
@@ -154,14 +154,14 @@ description: unconditional indirect jump by signed offset
 
 ### External devices
 
-External devices can be accessed with any memory instruction: load, store,
-addm, orm, ...
+External devices can be accessed via MMIO with any memory instruction: load,
+store, addm, orm, etc. Addresses 0xffffff00-0xffffffff are reserved for MMIO.
 
 In write operations to registers in descriptions below, it is assumed that
 "arg" is 32-bit value written to register.
 
 In read operations from registers in descriptions below, it is assumed that
-"rval" is 32-bit value loaded from registers.
+"rval" is 32-bit value loaded from register.
 
 
 ##### IO
@@ -169,7 +169,7 @@ In read operations from registers in descriptions below, it is assumed that
 | Register          | MMIO address | Mode |
 |-------------------|--------------|------|
 | IO_STDIN          | 0xffffff00   |  RO  |
-| IO_STDOUT         | 0xffffff04   |  WO  |
+| IO_STDOUT         | 0xffffff01   |  WO  |
 
 Description:
 ```
@@ -182,11 +182,11 @@ IO_STDOUT: putchar(arg & 0xf)
 | Register          | MMIO address | Mode |
 |-------------------|--------------|------|
 | SIM_CLEAR         | 0xffffff10   |  WO  |
-| SIM_DISPLAY       | 0xffffff14   |  WO  |
-| SIM_PIXEL_SHAPE   | 0xffffff18   |  RW  |
-| SIM_PIXEL_COLOR   | 0xffffff1a   |  RW  |
-| SIM_SET_PIXEL     | 0xffffff20   |  WO  |
-| SIM_RAND          | 0xffffff24   |  RO  |
+| SIM_DISPLAY       | 0xffffff11   |  WO  |
+| SIM_PIXEL_COLOR   | 0xffffff12   |  RW  |
+| SIM_PIXEL_SHAPE   | 0xffffff13   |  RW  |
+| SIM_SET_PIXEL     | 0xffffff14   |  WO  |
+| SIM_RAND          | 0xffffff15   |  RO  |
 
 Description:
 ```

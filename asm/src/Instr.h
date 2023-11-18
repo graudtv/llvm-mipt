@@ -17,8 +17,23 @@ enum : unsigned {
   INSTR_R2_SHIFT = 16,
   INSTR_R3_SHIFT = 11,
 
-  INSTR_R_MASK = 0x1f,
-  INSTR_IMM_MASK = 0xffff
+  REG_COUNT = 32,
+  INSTR_R_MASK = REG_COUNT - 1,
+  INSTR_IMM_MASK = 0xffff,
+};
+
+enum : uintptr_t {
+  MMIO_IO_STDIN = 0xffffff00,
+  MMIO_IO_STDOUT = 0xffffff01,
+
+  MMIO_SIM_CLEAR = 0xffffff10,
+  MMIO_SIM_DISPLAY = 0xffffff11,
+  MMIO_SIM_PIXEL_COLOR = 0xffffff12,
+  MMIO_SIM_PIXEL_SHAPE = 0xffffff13,
+  MMIO_SIM_SET_PIXEL = 0xffffff14,
+  MMIO_SIM_RAND = 0xffffff15,
+
+  MMIO_MASK = 0xffffff00
 };
 
 enum : unsigned {
@@ -152,7 +167,7 @@ public:
   }
   reg_t imm() const {
     assert(getType() == InstrType::I && "Only I instructions have imm");
-    return Ins & INSTR_R_MASK;
+    return Ins & INSTR_IMM_MASK;
   }
 
   void print(std::ostream &Os = std::cout) const {
