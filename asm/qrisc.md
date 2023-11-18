@@ -5,86 +5,67 @@
 qrisc (cute risc) is a minimalistic 32-bit risc architecture for research
 purposes
 
+Features:
+* 32 general purpose registers
+* Up to 48 different instruction in the base encoding
+
 ### List of instructions
 
 ```
 | opcode  | encoding |
 |---------|----------|
-| add     | 0x04     |
-| addi    | 0x05     |
-| addm    | 0x06     |
+| add     | 0x01     |
+| addi    | 0x02     |
+| addm    | 0x03     |
 |         |          |
-| and     | 0x08     |
-| andi    | 0x09     |
-| andm    | 0x0a     |
+| and     | 0x04     |
+| andi    | 0x05     |
+| andm    | 0x06     |
 |         |          |
-| or      | 0x0c     |
-| ori     | 0x0d     |
-| orm     | 0x0e     |
+| or      | 0x07     |
+| ori     | 0x08     |
+| orm     | 0x09     |
 |         |          |
-| xor     | 0x10     |
-| xori    | 0x11     |
-| xorm    | 0x12     |
+| xor     | 0x0a     |
+| xori    | 0x0b     |
+| xorm    | 0x0c     |
 |         |          |
-| urem    | 0x14     |
-| uremi   | 0x15     |
-| uremm   | 0x16     |
+| urem    | 0x0d     |
+| uremi   | 0x0e     |
+| uremm   | 0x0f     |
 |         |          |
-| load    | 0x18     |
-| store   | 0x19     |
+| load    | 0x10     |
+| store   | 0x11     |
+| lui     | 0x12     |
 |         |          |
-| lli     | 0x1a     |
-| lui     | 0x1b     |
-|         |          |
-| bz      | 0xf0     |
-| bnz     | 0xf1     |
-| be      | 0xf2     |
-| bne     | 0xf3     |
-| bgt     | 0xf4     |
-| bge     | 0xf5     |
-| blt     | 0xf6     |
-| ble     | 0xf7     |
-|         |          |
-| jalr    | 0xf8     |
+| beq     | 0x28     |
+| bne     | 0x2a     |
+| bgt     | 0x2a     |
+| bge     | 0x2b     |
+| blt     | 0x2c     |
+| ble     | 0x2d     |
+| jalr    | 0x2e     |
 ```
 
-Pseudo instructions:
-```
-| pseudo instr    |       equivalent       |
-|-----------------|------------------------|
-| jr reg, offset  | jalr zero, reg, offset |
-| ret             | jalr zero, ra, 0       |
-| push reg        | store reg, rsp, 0      |
-| pop reg         | load reg, rsp, 0       |
-| mv rdst, rsrc   | or rdst, rsrc, zero    |
-```
+Opcodes 0x30-0x3f reserved for future extensions.
 
-### Instruction Encoding
+### Instruction Types
 ```
 R(egister) type
 
- 31            24 23            16 15             8 7              0
----------------------------------------------------------------------
-|     opcode     |      r1        |       r2       |       r3       |
----------------------------------------------------------------------
+ 31        26 25      21 20      16 15      11 10                       0
+--------------------------------------------------------------------------
+|   opcode   |    r1    |    r2    |    r3    |             0            |
+--------------------------------------------------------------------------
 ```
 
 ```
 I(mmediate) type
 
- 31            24 23            16 15             8 7              0
----------------------------------------------------------------------
-|     opcode     |      r1        |      r2        |      imm       |
----------------------------------------------------------------------
-```
-
-```
-WI type (wide immediate)
-
- 31            24 23            16 15                              0
----------------------------------------------------------------------
-|     opcode     |      r1        |               imm               |
----------------------------------------------------------------------
+ 31        26 25      21 20      16 15                                  0
+--------------------------------------------------------------------------
+|   opcode   |    r1    |    r2    |               imm                   |
+--------------------------------------------------------------------------
 ```
 
 ### Semantics
@@ -94,31 +75,28 @@ WI type (wide immediate)
 opcodes: add, or, and, xor, urem
 type: R
 semantics: r1 = r2 <op> r3
+description: binary operation on 4 registers
 ```
 
 ```
 opcodes: addi, ori, andi, xori, uremi
 type: I
 semantics: r1 = r2 <op> imm
+description: binary operation on register and immediate. imm is signed for
+             addi, unsigned for other instructions
 ```
 
 ```
 opcodes: addm, orm, andm, xorm
 type: I
 semantics: r1 = r1 <op> mem[r2 + imm]
-```
-
-```
-opcode: lli
-type: WI
-semantics: r1 = imm
-description: set 16 lower bits to imm, set 16 upper bits to zero
+description: binary operation on register and value in memory. imm is unsigned
 ```
 
 ```
 opcode: lui
-type: WI
-semantics: r1 = r1 | (imm << 16)
+type: I
+semantics: r1 = r2 | (imm & 0x00ff << 16)
 description: set 16 upper bits to imm
 ```
 
@@ -126,27 +104,30 @@ description: set 16 upper bits to imm
 opcode: load
 type: I
 semantics: r1 = mem[r2 + imm]
+description: load value from memory to register
 ```
 
 ```
 opcode: store
 type: I
 semantics: mem[r2 + imm] = r1
+description: save value from register to memory
 ```
-
 
 ##### Control Flow Instructions
 
 ```
-opcodes: bz, bnz, be, bne, bgt, bge, blt, ble
+opcodes: beq, bne, bgt, bge, blt, ble
 type: I
-semantics: next_pc = (r1 <op> r2) ? (pc + offset) : pc
+semantics: next_pc = (r1 <op> r2) ? (pc + imm * 4) : pc
+description: jump by signed offset to pc if condition is satisfied
 ```
 
 ```
 opcode: jalr
 type: I
 semantics: (r1, next_pc) = (pc + 4, r2 + imm * 4)
+description: unconditional indirect jump by signed offset
 ```
 
 ### ABI
@@ -155,10 +136,14 @@ semantics: (r1, next_pc) = (pc + 4, r2 + imm * 4)
 |----------|----------|------------------------------------------|--------|
 | r0       | zero     | Hard-wired zero                          |   -    |
 | r1       | ra       | Function return address                  | Caller |
-| r2-r3    | rv1, rv2 | Function return values                   | Caller |
-| r4-r8    | a0-a4    | Function arguments                       | Caller |
-| r9-r14   | t0-t5    | Temporary values                         | Caller |
-| r15      | rsp      | Stack pointer                            | Callee |
+| r2-r5    | rv0-rv3  | Function return values                   | Caller |
+| r6-r11   | a0-a5    | Function arguments                       | Caller |
+| r12-r19  | t0-t7    | Temporary values                         | Caller |
+| r20-r25  | s0-s5    | Save register                            | Callee |
+| r26-r28  | Reserved | Reserved                                 |   -    |
+| r29      | rsp      | Stack pointer                            | Callee |
+| r30      | rbp      | Stack base pointer                       | Callee |
+| r31      | rpc      | Hard-wired PC (read only)                |   -    |
 
 * If function has more arguments or return values than number of associated
   registers, it is unspecified how they are passed
@@ -192,7 +177,6 @@ IO_STDION: rval = getchar()
 IO_STDOUT: putchar(arg & 0xf)
 ```
 
-
 ##### Display
 
 | Register          | MMIO address | Mode |
@@ -215,5 +199,52 @@ SIM_SET_PIXEL:
                 color = *(uint32 *) SIM_PIXEL_COLOR,
                 shape = *(uint32 *) SIM_PIXEL_SHAPE)
 SIM_RAND: rval = sim_rand()
+```
+
+### Assembly language
+
+##### Notation
+```
+<label>:                          # label
+  <mnemonic> r1, r2, r3           # R-type instruction
+  <mnemonic> r1, r2, imm          # I-type instruction
+```
+
+Label names can be used as immediates. Meaning depends on the instruction:
+
+- When used in jump and branch instructions, imm is set to offset in bytes of
+  the label from the current instruction devided by 4, so that the jump is
+  performed on the instruction under the label
+- When used in arithmetic instructions, imm is set to offset in bytes of the
+  label from the current instruction
+
+Examples:
+```
+  j label
+  ...
+label:
+```
+
+```
+  val1: .i32 0x12345678
+  val2: .i32 0xffffffff
+  ...
+  addi t0, rpc, value      # t0 = &val1
+  load t1, t0, 0           # t1 = val1 = 0x12345678
+  load t2, t0, 4           # t2 = val2 = 0xffffffff
+```
+
+##### Pseudo intructions
+```
+| pseudo instr    |       equivalent       |
+|-----------------|------------------------|
+| j offset        | jal zero, offset       |
+| jr reg, offset  | jalr zero, reg, offset |
+| bz reg, offset  | beq reg, zero, offset  |
+| bnz reg, offset | bne reg, zero, offset  |
+| ret             | jalr zero, ra, 0       |
+| push reg        | store reg, rsp, 0      |
+| pop reg         | load reg, rsp, 0       |
+| mv rdst, rsrc   | or rdst, rsrc, zero    |
 ```
 
