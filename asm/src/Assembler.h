@@ -28,13 +28,15 @@ public:
   static Assembler &getInstance();
 
   void parse(FILE *In);
-  void writeToFile(const std::string &Filename);
-  void write(std::ostream &Os);
-  void print(std::ostream &Os);
+  void parseFile(const std::string &Filename);
+  void parseFileOrStdin(const std::string &Filename);
+
+  void write(std::ostream &Os) const;
+  void print(std::ostream &Os) const;
 
   const std::vector<Instr> &getInstructions() const { return Instrs; }
 
-  /* Invoked by parser */
+  /* Interface for parser */
   void appendLabel(const char *label);
   void appendRInstr(opcode_t opcode, reg_t r1, reg_t r2, reg_t r3);
   void appendIInstr(opcode_t opcode, reg_t r1, reg_t r2, imm_t imm);

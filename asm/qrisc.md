@@ -246,8 +246,6 @@ label:
 | bz reg, offset  | beq reg, zero, offset  |
 | bnz reg, offset | bne reg, zero, offset  |
 | ret             | jalr zero, ra, 0       |
-| push reg        | store reg, rsp, 0      |
-| pop reg         | load reg, rsp, 0       |
 | mv rdst, rsrc   | xor rdst, rsrc, zero   |
 
 Macro commands: .word value

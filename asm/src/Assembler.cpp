@@ -1,6 +1,8 @@
 #include "Assembler.h"
 #include <algorithm>
 #include <cassert>
+#include <cstdio>
+#include <cstring>
 
 using namespace qrisc;
 
@@ -14,11 +16,34 @@ Assembler &Assembler::getInstance() {
 
 void Assembler::parse(FILE *In) {
   yyin = In;
-  while (yyparse() == 0 && !feof(stdin))
+  while (yyparse() == 0 && !feof(In))
     ;
 }
 
-void Assembler::print(std::ostream &Os) {
+void Assembler::parseFile(const std::string &Filename) {
+  FILE *In = fopen(Filename.c_str(), "r");
+  if (!In) {
+    int Err = errno;
+    std::cerr << "Failed to open file '" << Filename << "': " << strerror(Err) << std::endl;
+    exit(1);
+  }
+  parse(In);
+  fclose(In);
+}
+
+void Assembler::parseFileOrStdin(const std::string &Filename) {
+  if (Filename.empty() || Filename == "-")
+    parse(stdin);
+  else
+    parseFile(Filename);
+}
+
+void Assembler::write(std::ostream &Os) const {
+  Os.write(reinterpret_cast<const char *>(Instrs.data()),
+           Instrs.size() * sizeof(Instr));
+}
+
+void Assembler::print(std::ostream &Os) const {
   std::for_each(Instrs.begin(), Instrs.end(), [&Os](Instr I) { I.print(Os); });
 }
 

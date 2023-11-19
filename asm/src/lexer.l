@@ -1,4 +1,5 @@
 %option noyywrap
+%option yylineno
 
 %{
 #include <iostream>
@@ -13,9 +14,10 @@ using namespace qrisc;
 
 [ \t]	; /* ignore whitespaces */
 #.*     ; /* ingore commets */
+
 [\n]            { return TK_NEWLINE; }
 ,               { return TK_COMMA; }
-[a-zA-Z_]+:     { yylval.label = yytext; return TK_LABEL; }
+:               { return TK_COLON; }
 
   /* instruction mnemonics */
 add|ADD         { yylval.opcode = OPCODE_ADD; return TK_R_INSTR; }
@@ -43,7 +45,7 @@ sltiu|STLIU     { yylval.opcode = OPCODE_SLTIU; return TK_I_INSTR; }
 load|LOAD       { yylval.opcode = OPCODE_LOAD; return TK_I_INSTR; }
 store|STORE     { yylval.opcode = OPCODE_STORE; return TK_I_INSTR; }
 
-be|BEQ          { yylval.opcode = OPCODE_BEQ; return TK_I_INSTR; }
+beq|BEQ         { yylval.opcode = OPCODE_BEQ; return TK_I_INSTR; }
 bne|BNE         { yylval.opcode = OPCODE_BNE; return TK_I_INSTR; }
 bgt|BGT         { yylval.opcode = OPCODE_BGT; return TK_I_INSTR; }
 bge|BGE         { yylval.opcode = OPCODE_BGE; return TK_I_INSTR; }
@@ -53,7 +55,7 @@ jalr|JALR       { yylval.opcode = OPCODE_JALR; return TK_I_INSTR; }
 
   /* numeric literals */
 0x[0-9a-fA-F]+  {yylval.imm = strtol(yytext, nullptr, 16); return TK_IMM; }
-[0-9]+          {yylval.imm = atoi(yytext); return TK_IMM; }
+[-]?[0-9]+      {yylval.imm = atoi(yytext); return TK_IMM; }
   /* ISA registers */
 r[0-9]|r[1-2][0-9]|r30|r31   {yylval.reg = atoi(yytext + 1); return TK_REG; }
   /* ABI registers */
@@ -86,6 +88,9 @@ s5              { yylval.reg = 25; return TK_REG; }
 rsp             { yylval.reg = 29; return TK_REG; }
 rbp             { yylval.reg = 30; return TK_REG; }
 rpc             { yylval.reg = 31; return TK_REG; }
+
+  /* Identifiers must be handled after everithing else */
+[a-zA-Z_.]+     { yylval.id = yytext; return TK_IDENTIFIER; }
 
 .               {
                   std::cerr << "line " << yylineno << ": unexpected symbol: " << yytext << "\n";

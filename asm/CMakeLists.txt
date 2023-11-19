@@ -25,19 +25,28 @@ add_library(sim STATIC ${CMAKE_CURRENT_SOURCE_DIR}/../life_game/sim/sim.cpp)
 target_link_libraries(sim PUBLIC sfml-graphics sfml-system sfml-window)
 target_include_directories(sim INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/../life_game/sim)
 
-add_executable(qrisc
-  src/main.cpp
+include_directories(
+  src
+  ${LLVM_INCLUDE_DIRS}
+  ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+# qrisc-asm
+add_executable(qrisc-asm
+  src/qrisc-asm.cpp
   src/Assembler.cpp
-  src/LLVMSimulator.cpp
   ${FLEX_lexer_OUTPUTS}
   ${BISON_parser_OUTPUTS}
 )
+target_compile_definitions(qrisc-asm PRIVATE ${LLVM_DEFINITIONS_LIST})
+target_link_libraries(qrisc-asm LLVMCore)
 
-target_include_directories(qrisc PRIVATE
-  ${LLVM_INCLUDE_DIRS}
-  src
-  ${CMAKE_CURRENT_BINARY_DIR}
+# qrisc-sim
+add_executable(qrisc-sim
+  src/qrisc-sim.cpp
+  src/Assembler.cpp
+  ${FLEX_lexer_OUTPUTS}
+  ${BISON_parser_OUTPUTS}
 )
-target_compile_definitions(qrisc PRIVATE ${LLVM_DEFINITIONS_LIST})
-target_link_libraries(qrisc LLVM sim)
-
+target_compile_definitions(qrisc-sim PRIVATE ${LLVM_DEFINITIONS_LIST})
+target_link_libraries(qrisc-sim LLVMCore sim)

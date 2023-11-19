@@ -11,7 +11,9 @@ typedef unsigned opcode_t;
 typedef unsigned reg_t;
 typedef unsigned imm_t;
 typedef signed simm_t;
+typedef uint32_t instr_t;
 
+/* Encoding shifts and masks */
 enum : unsigned {
   INSTR_OPCODE_SHIFT = 26,
   INSTR_R1_SHIFT = 21,
@@ -23,7 +25,16 @@ enum : unsigned {
   INSTR_IMM_MASK = 0xffff,
 };
 
-enum : uintptr_t {
+/* Register indices */
+enum : unsigned {
+  REG_ZERO = 0,
+  REG_SP = 29,
+  REG_BP = 30,
+  REG_PC = 31
+};
+
+/* MMIO addresses */
+enum : unsigned {
   MMIO_IO_STDIN = 0xffffff00,
   MMIO_IO_STDOUT = 0xffffff01,
 
@@ -37,6 +48,7 @@ enum : uintptr_t {
   MMIO_MASK = 0xffffff00
 };
 
+/* Opcodes */
 enum : unsigned {
   OPCODE_ADD = 0x01,
   OPCODE_ADDI = 0x02,
@@ -59,10 +71,8 @@ enum : unsigned {
   OPCODE_SLTI = 0x13,
   OPCODE_SLTIU = 0x14,
   OPCODE_LUI = 0x15,
-
   OPCODE_LOAD = 0x16,
   OPCODE_STORE = 0x17,
-
   OPCODE_BEQ = 0x28,
   OPCODE_BNE = 0x29,
   OPCODE_BGT = 0x2a,
@@ -155,9 +165,10 @@ inline const char *getInstrMnemonic(opcode_t opcode) {
 
 class Instr {
   uint32_t Ins;
-  Instr(uint32_t I) : Ins(I) {}
 
 public:
+  Instr(uint32_t I) : Ins(I) {}
+
   static Instr makeRInstr(opcode_t opcode, reg_t r1, reg_t r2, reg_t r3) {
     assert(!(r1 & ~INSTR_R_MASK) && "register out of bounds");
     assert(!(r2 & ~INSTR_R_MASK) && "register out of bounds");
@@ -169,7 +180,6 @@ public:
   static Instr makeIInstr(opcode_t opcode, reg_t r1, reg_t r2, imm_t imm) {
     assert(!(r1 & ~INSTR_R_MASK) && "register out of bounds");
     assert(!(r2 & ~INSTR_R_MASK) && "register out of bounds");
-    assert(!(imm & ~INSTR_IMM_MASK) && "immediate out of bounds");
     assert((getInstrType(opcode) == InstrType::SI ||
             getInstrType(opcode) == InstrType::UI) &&
            "must be I-instr");
@@ -207,7 +217,7 @@ public:
       Os << ", r" << r3();
     else
       Os << ", " << imm();
-    Os << "\n";
+    Os << std::endl;
   }
 };
 
