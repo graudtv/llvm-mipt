@@ -15,7 +15,7 @@ struct UnresolvedLabel {
 
 class Assembler {
   std::vector<Instr> Instrs;
-  std::unordered_map<std::string, unsigned> Labels;
+  std::unordered_map<std::string, unsigned /* InstrIdx */> Labels;
   std::vector<UnresolvedLabel> UnresolvedLabels;
 
   Assembler() = default;

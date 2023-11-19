@@ -10,13 +10,13 @@ entry:
   addi t1, zero, 9
 
 loop:
-  bgt t0, t1, 6 # while (i < 9)
+  bgt t0, t1, exit # while (i < 9)
   addi t2, t0, 48 # char c = i + '0'
   store t2, s0, 0 # putchar(c)
   store s1, s0, 0 # puchar(' ')
   addi t0, t0, 1 # ++i
-  jalr zero, rpc, -5
-  # jalr here is equivalent to 'beq zero, zero, -5'
+  jalr zero, rpc, loop
+  # jalr here is equivalent to 'beq zero, zero, loop'
 
 exit:
   ori t2, zero, 0x0a # '\n'

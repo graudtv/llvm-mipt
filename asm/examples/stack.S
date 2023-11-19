@@ -20,12 +20,12 @@ init_stack:
 
   xor t0, t0, t0
 loop: # while (c != '\0')
-  add t1, rsp, t0 # void *ptr = stack[offset]
-  load t1, t1, 0 # t1 = c
-  beq t1, zero, 4
-  store t1, s0, 0
+  add t1, rsp, t0 # char *ptr = stack[offset]
+  load t1, t1, 0 # t1 = c = *ptr
+  beq t1, zero, exit
+  store t1, s0, 0 # putchar(c)
   addi t0, t0, 4 # ptr += 4
-  beq zero, zero, -5
+  jalr zero, rpc, loop
 exit:
   ori t1, zero, 0x0a # '\n'
   store t1, s0, 0

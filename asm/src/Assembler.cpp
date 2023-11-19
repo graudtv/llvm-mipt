@@ -24,7 +24,8 @@ void Assembler::parseFile(const std::string &Filename) {
   FILE *In = fopen(Filename.c_str(), "r");
   if (!In) {
     int Err = errno;
-    std::cerr << "Failed to open file '" << Filename << "': " << strerror(Err) << std::endl;
+    std::cerr << "Failed to open file '" << Filename << "': " << strerror(Err)
+              << std::endl;
     exit(1);
   }
   parse(In);
@@ -70,4 +71,16 @@ void Assembler::appendIInstr(opcode_t opcode, reg_t r1, reg_t r2,
   Instrs.push_back(Instr::makeIInstr(opcode, r1, r2, 0));
 }
 
-void Assembler::finalize() {}
+void Assembler::finalize() {
+  for (auto &UL : UnresolvedLabels) {
+    Instr &User = Instrs[UL.InstrIdx];
+    auto It = Labels.find(UL.Label);
+    if (It == Labels.end()) {
+      std::cerr << "Error: in instruction " << User.getMnemonic()
+                << ": undefined label '" << UL.Label << "'" << std::endl;
+      exit(1);
+    }
+    unsigned Imm = It->second - UL.InstrIdx;
+    User = Instr::makeIInstr(User.getOpcode(), User.r1(), User.r2(), Imm);
+  }
+}

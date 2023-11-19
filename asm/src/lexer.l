@@ -90,7 +90,7 @@ rbp             { yylval.reg = 30; return TK_REG; }
 rpc             { yylval.reg = 31; return TK_REG; }
 
   /* Identifiers must be handled after everithing else */
-[a-zA-Z_.]+     { yylval.id = yytext; return TK_IDENTIFIER; }
+[a-zA-Z_.]+     { yylval.id = strdup(yytext); return TK_IDENTIFIER; }
 
 .               {
                   std::cerr << "line " << yylineno << ": unexpected symbol: " << yytext << "\n";

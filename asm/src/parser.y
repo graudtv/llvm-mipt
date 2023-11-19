@@ -19,7 +19,7 @@ qrisc::Assembler &Asm = qrisc::Assembler::getInstance();
 
 %define parse.error detailed
 
-%union { unsigned opcode; unsigned reg; unsigned imm; const char *id;}
+%union { unsigned opcode; unsigned reg; unsigned imm; char *id;}
 
 %token TK_COMMA "comma";
 %token TK_NEWLINE "newline";
@@ -44,9 +44,9 @@ r_instr: TK_R_INSTR TK_REG TK_COMMA TK_REG TK_COMMA TK_REG
 i_instr: TK_I_INSTR TK_REG TK_COMMA TK_REG TK_COMMA TK_IMM
          { Asm.appendIInstr($1, $2, $4, $6); }
 i_instr: TK_I_INSTR TK_REG TK_COMMA TK_REG TK_COMMA TK_IDENTIFIER
-         { Asm.appendIInstr($1, $2, $4, $6); }
+         { Asm.appendIInstr($1, $2, $4, $6); free($6); }
 label: TK_IDENTIFIER TK_COLON
-         { Asm.appendLabel($1); }
+         { Asm.appendLabel($1); free($1); }
 
 %%
 

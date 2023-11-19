@@ -213,13 +213,10 @@ SIM_RAND: rval = sim_rand()
   <mnemonic> r1, r2, imm          # I-type instruction
 ```
 
-Label names can be used as immediates. Meaning depends on the instruction:
-
-- When used in jump and branch instructions, imm is set to offset in bytes of
-  the label from the current instruction devided by 4, so that the jump is
-  performed on the instruction under the label
-- When used in arithmetic instructions, imm is set to offset in bytes of the
-  label from the current instruction
+Label names can be used as immediates in branch and jalr instructions. This
+sets immediate to offset in bytes of the label from the current instruction
+devided by 4, so that the branch/jump is performed on the instruction under
+the label
 
 Examples:
 ```
