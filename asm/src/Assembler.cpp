@@ -35,13 +35,11 @@ void Assembler::appendRInstr(opcode_t opcode, reg_t r1, reg_t r2, reg_t r3) {
 }
 
 void Assembler::appendIInstr(opcode_t opcode, reg_t r1, reg_t r2, imm_t imm) {
-  assert(getInstrType(opcode) == InstrType::I && "not an I-instr");
   Instrs.push_back(Instr::makeIInstr(opcode, r1, r2, imm));
 }
 
 void Assembler::appendIInstr(opcode_t opcode, reg_t r1, reg_t r2,
                              const char *label) {
-  assert(getInstrType(opcode) == InstrType::I && "not an I-instr");
   UnresolvedLabels.push_back(
       UnresolvedLabel{std::string(label), getNextInstrIdx()});
   Instrs.push_back(Instr::makeIInstr(opcode, r1, r2, 0));

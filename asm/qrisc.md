@@ -6,45 +6,47 @@ qrisc (cute risc) is a minimalistic 32-bit risc architecture for research
 purposes
 
 Features:
-* 32 general purpose registers
-* 25 instructions
+* 32-bit arithmetics and addressing
+* 32 registers
+* 30 instructions
 
 ### List of instructions
 
 ```
-| opcode  | encoding |
-|---------|----------|
-| add     | 0x01     |
-| addi    | 0x02     |
-| addm    | 0x03     |
-|         |          |
-| and     | 0x04     |
-| andi    | 0x05     |
-| andm    | 0x06     |
-|         |          |
-| or      | 0x07     |
-| ori     | 0x08     |
-| orm     | 0x09     |
-|         |          |
-| xor     | 0x0a     |
-| xori    | 0x0b     |
-| xorm    | 0x0c     |
-|         |          |
-| urem    | 0x0d     |
-| uremi   | 0x0e     |
-| uremm   | 0x0f     |
-|         |          |
-| load    | 0x10     |
-| store   | 0x11     |
-| lui     | 0x12     |
-|         |          |
-| beq     | 0x28     |
-| bne     | 0x2a     |
-| bgt     | 0x2a     |
-| bge     | 0x2b     |
-| blt     | 0x2c     |
-| ble     | 0x2d     |
-| jalr    | 0x2e     |
+| mnemonic | encoding |
+|----------|----------|
+| add      | 0x01     |
+| addi     | 0x02     |
+| and      | 0x03     |
+| andi     | 0x04     |
+| or       | 0x05     |
+| ori      | 0x06     |
+| xor      | 0x07     |
+| xori     | 0x08     |
+| sub      | 0x09     |
+| subi     | 0x0a     |
+| mul      | 0x0b     |
+| muli     | 0x0c     |
+| divu     | 0x0d     |
+| diviu    | 0x0e     |
+| remu     | 0x0f     |
+| remiu    | 0x10     |
+| slt      | 0x11     |
+| slti     | 0x12     |
+| sltu     | 0x13     |
+| sltiu    | 0x14     |
+| lui      | 0x15     |
+|          |          |
+| load     | 0x16     |
+| store    | 0x17     |
+|          |          |
+| beq      | 0x28     |
+| bne      | 0x2a     |
+| bgt      | 0x2a     |
+| bge      | 0x2b     |
+| blt      | 0x2c     |
+| ble      | 0x2d     |
+| jalr     | 0x2e     |
 ```
 
 Opcodes 0x30-0x3f reserved for future extensions.
@@ -70,47 +72,48 @@ I(mmediate) type
 
 ### Semantics
 
-##### Arithemetic and Memory Instructions
+##### Arithemetic Instructions
 ```
-opcodes: add, or, and, xor, urem
+opcodes: add, or, and, xor, sub, mul, divu, remu, slt, sltu
 type: R
 semantics: r1 = r2 <op> r3
-description: binary operation on 4 registers
+description: binary operation on 2 registers
 ```
 
 ```
-opcodes: addi, ori, andi, xori, uremi
+opcodes: addi, ori, andi, xori, subi, muli, diviu, remiu, slti
 type: I
-semantics: r1 = r2 <op> imm
-description: binary operation on register and immediate. imm is signed for
-             addi, unsigned for other instructions
+semantics: r1 = r2 <op> sign_extend(imm)
+description: binary operation on register and immediate
 ```
 
 ```
-opcodes: addm, orm, andm, xorm
+opcode: remiu, sltiu
 type: I
-semantics: r1 = r1 <op> mem[r2 + imm]
-description: binary operation on register and value in memory. imm is unsigned
+semantics: r1 = r2 <op> zero_extend(imm)
+description: binary operation on register and immediate
 ```
 
 ```
 opcode: lui
 type: I
-semantics: r1 = r2 | (imm & 0x00ff << 16)
+semantics: r1 = r2 | (zero_extend(imm) & 0x00ff << 16)
 description: set 16 upper bits to imm
 ```
+
+##### Memory Instructions
 
 ```
 opcode: load
 type: I
-semantics: r1 = mem[r2 + imm]
+semantics: r1 = mem[r2 + zero_extend(imm)]
 description: load value from memory to register
 ```
 
 ```
 opcode: store
 type: I
-semantics: mem[r2 + imm] = r1
+semantics: mem[r2 + zero_extend(imm)] = r1
 description: save value from register to memory
 ```
 
@@ -119,14 +122,14 @@ description: save value from register to memory
 ```
 opcodes: beq, bne, bgt, bge, blt, ble
 type: I
-semantics: next_pc = (r1 <op> r2) ? (pc + imm * 4) : pc
+semantics: next_pc = (r1 <op> r2) ? (pc + sign_extend(imm) * 4) : pc
 description: jump by signed offset to pc if condition is satisfied
 ```
 
 ```
 opcode: jalr
 type: I
-semantics: (r1, next_pc) = (pc + 4, r2 + imm * 4)
+semantics: (r1, next_pc) = (pc + 4, r2 + sign_extend(imm) * 4)
 description: unconditional indirect jump by signed offset
 ```
 
@@ -245,6 +248,8 @@ label:
 | ret             | jalr zero, ra, 0       |
 | push reg        | store reg, rsp, 0      |
 | pop reg         | load reg, rsp, 0       |
-| mv rdst, rsrc   | or rdst, rsrc, zero    |
+| mv rdst, rsrc   | xor rdst, rsrc, zero   |
+
+Macro commands: .word value
 ```
 

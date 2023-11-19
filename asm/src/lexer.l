@@ -20,28 +20,28 @@ using namespace qrisc;
   /* instruction mnemonics */
 add|ADD         { yylval.opcode = OPCODE_ADD; return TK_R_INSTR; }
 addi|ADDI       { yylval.opcode = OPCODE_ADDI; return TK_I_INSTR; }
-addm|ADDM       { yylval.opcode = OPCODE_ADDM; return TK_I_INSTR; }
-
 and|AND         { yylval.opcode = OPCODE_AND; return TK_R_INSTR; }
 andi|ANDI       { yylval.opcode = OPCODE_ANDI; return TK_I_INSTR; }
-andm|ANDM       { yylval.opcode = OPCODE_ANDM; return TK_I_INSTR; }
-
 or|OR           { yylval.opcode = OPCODE_OR; return TK_R_INSTR; }
 ori|ORI         { yylval.opcode = OPCODE_ORI; return TK_I_INSTR; }
-orm|ORM         { yylval.opcode = OPCODE_ORM; return TK_I_INSTR; }
-
 xor|XOR         { yylval.opcode = OPCODE_XOR; return TK_R_INSTR; }
 xori|XORI       { yylval.opcode = OPCODE_XORI; return TK_I_INSTR; }
-xorm|XORM       { yylval.opcode = OPCODE_XORM; return TK_I_INSTR; }
-
-urem|UREM       { yylval.opcode = OPCODE_UREM; return TK_R_INSTR; }
-uremi|UREMI     { yylval.opcode = OPCODE_UREMI; return TK_I_INSTR; }
-uremm|UREMM     { yylval.opcode = OPCODE_UREMM; return TK_I_INSTR; }
+sub|SUB         { yylval.opcode = OPCODE_SUB; return TK_R_INSTR; }
+subi|SUBI       { yylval.opcode = OPCODE_SUBI; return TK_I_INSTR; }
+mul|MUL         { yylval.opcode = OPCODE_MUL; return TK_R_INSTR; }
+muli|MULI       { yylval.opcode = OPCODE_MULI; return TK_I_INSTR; }
+divu|DIVU       { yylval.opcode = OPCODE_DIVU; return TK_R_INSTR; }
+diviu|DIVIU     { yylval.opcode = OPCODE_DIVIU; return TK_I_INSTR; }
+remu|UREMU      { yylval.opcode = OPCODE_REMU; return TK_R_INSTR; }
+remiu|UREMIU    { yylval.opcode = OPCODE_REMIU; return TK_I_INSTR; }
+lui|LUI         { yylval.opcode = OPCODE_LUI; return TK_I_INSTR; }
+slt|SLT         { yylval.opcode = OPCODE_SLT; return TK_R_INSTR; }
+slti|SLTI       { yylval.opcode = OPCODE_SLTI; return TK_I_INSTR; }
+sltu|SLTU       { yylval.opcode = OPCODE_SLTU; return TK_R_INSTR; }
+sltiu|STLIU     { yylval.opcode = OPCODE_SLTIU; return TK_I_INSTR; }
 
 load|LOAD       { yylval.opcode = OPCODE_LOAD; return TK_I_INSTR; }
 store|STORE     { yylval.opcode = OPCODE_STORE; return TK_I_INSTR; }
-
-lui|LUI         { yylval.opcode = OPCODE_LUI; return TK_I_INSTR; }
 
 be|BEQ          { yylval.opcode = OPCODE_BEQ; return TK_I_INSTR; }
 bne|BNE         { yylval.opcode = OPCODE_BNE; return TK_I_INSTR; }

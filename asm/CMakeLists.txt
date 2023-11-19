@@ -28,7 +28,7 @@ target_include_directories(sim INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/../life_gam
 add_executable(qrisc
   src/main.cpp
   src/Assembler.cpp
-  src/Simulator.cpp
+  src/LLVMSimulator.cpp
   ${FLEX_lexer_OUTPUTS}
   ${BISON_parser_OUTPUTS}
 )
