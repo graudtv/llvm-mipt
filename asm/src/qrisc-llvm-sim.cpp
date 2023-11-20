@@ -119,12 +119,12 @@ void simulate(const std::vector<Instr> &Instrs) {
     Builder.CreateStore(V, getRegPtr(Idx));
   };
 
-  // declare void @__builtin_store(i32 %value, i32 %addr)
+  // declare void @__store(i32 %value, i32 %addr)
   FunctionCallee LazyStore =
       M->getOrInsertFunction("__store", Builder.getVoidTy(),
                              Builder.getInt32Ty(), Builder.getInt32Ty());
 
-  // declare i32 @__builtin_load(i32 %addr)
+  // declare i32 @__load(i32 %addr)
   FunctionCallee LazyLoad = M->getOrInsertFunction(
       "__load", Builder.getInt32Ty(), Builder.getInt32Ty());
 
