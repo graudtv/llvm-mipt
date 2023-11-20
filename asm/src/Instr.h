@@ -107,14 +107,14 @@ inline InstrType getInstrType(opcode_t opcode) {
   case OPCODE_BLT:
   case OPCODE_BLE:
   case OPCODE_JALR:
+  case OPCODE_LOAD:
+  case OPCODE_STORE:
     return InstrType::SI;
 
   case OPCODE_DIVIU:
   case OPCODE_REMIU:
   case OPCODE_SLTIU:
   case OPCODE_LUI:
-  case OPCODE_LOAD:
-  case OPCODE_STORE:
     return InstrType::UI;
   }
   return InstrType::Invalid;
@@ -137,8 +137,8 @@ inline const char *getInstrMnemonic(opcode_t opcode) {
   case OPCODE_MULI: return "muli";
   case OPCODE_DIVU: return "divu";
   case OPCODE_DIVIU: return "diviu";
-  case OPCODE_REMU: return "urem";
-  case OPCODE_REMIU: return "uremi";
+  case OPCODE_REMU: return "remu";
+  case OPCODE_REMIU: return "remiu";
   case OPCODE_SLT: return "slt";
   case OPCODE_SLTI: return "slti";
   case OPCODE_SLTU: return "sltu";

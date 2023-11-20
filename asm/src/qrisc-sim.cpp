@@ -12,7 +12,7 @@ cl::OptionCategory Options("Simulator options");
 cl::opt<std::string> InputFilename(cl::Positional, cl::desc("<input file>"),
                                    cl::Required, cl::cat(Options));
 cl::opt<unsigned> MemorySize("memory-size", cl::desc("RAM size in bytes"),
-                             cl::init(32 * 1024));
+                             cl::init(512 * 1024));
 cl::opt<unsigned> StackAddr("stack-addr", cl::desc("Stack address"),
                             cl::init(16 * 1024));
 cl::opt<bool> Trace("trace", cl::desc("Print all executed instructions"));
@@ -124,7 +124,7 @@ void Simulator::run(const std::vector<Instr> &Instrs) {
   RegFile[REG_BP] = RegFile[REG_SP] = StackAddr;    // initialize rsp and rbp
   memcpy(Memory.data(), Instrs.data(), BinarySize); // load binary to memory
 
-  while (RegFile[REG_PC] != BinarySize) {
+  while (getPC() != BinarySize) {
     reg_t PC = getPC();
     reg_t NextPC = PC + 4;
     Instr Ins = Instr(readUintFromMemory(PC));

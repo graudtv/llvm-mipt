@@ -106,14 +106,14 @@ description: set 16 upper bits to imm
 ```
 opcode: load
 type: I
-semantics: r1 = mem[r2 + zero_extend(imm)]
+semantics: r1 = mem[r2 + sign_extend(imm)]
 description: load value from memory to register
 ```
 
 ```
 opcode: store
 type: I
-semantics: mem[r2 + zero_extend(imm)] = r1
+semantics: mem[r2 + sign_extend(imm)] = r1
 description: save value from register to memory
 ```
 
@@ -198,7 +198,7 @@ SIM_DISPLAY: sim_display() // arg ignored
 SIM_PIXEL_SHAPE: buffer register
 SIM_PIXEL_COLOR: buffer register
 SIM_SET_PIXEL:
-  sim_set_pixel(x = arg & 0xf0, y = arg & 0x0f,
+  sim_set_pixel(x = (arg >> 16) & 0xffff, y = arg & 0xffff,
                 color = *(uint32 *) SIM_PIXEL_COLOR,
                 shape = *(uint32 *) SIM_PIXEL_SHAPE)
 SIM_RAND: rval = sim_rand()
@@ -230,11 +230,10 @@ label:
 
 ```
   val1: .i32 0x12345678
-  val2: .i32 0xffffffff
+  val1: .i32 0xffffffff
   ...
-  addi t0, rpc, value      # t0 = &val1
-  load t1, t0, 0           # t1 = val1 = 0x12345678
-  load t2, t0, 4           # t2 = val2 = 0xffffffff
+  addi t0, rpc, val1       # t0 = &val1
+  load t1, rpc, val2       # t1 = val2
 ```
 
 ##### Pseudo intructions
