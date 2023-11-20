@@ -1,8 +1,9 @@
 #include "Assembler.h"
 #include "Simulator.h"
 #include <llvm/Support/CommandLine.h>
-#include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/FormatVariadic.h>
+#include <llvm/Support/raw_ostream.h>
+#include <sim.h>
 
 using namespace qrisc;
 using namespace llvm;
@@ -15,12 +16,16 @@ cl::opt<unsigned> MemorySize("memory-size", cl::desc("RAM size in bytes"),
 cl::opt<unsigned> StackAddr("stack-addr", cl::desc("Stack address"),
                             cl::init(16 * 1024));
 cl::opt<bool> Trace("trace", cl::desc("Print all executed instructions"));
-cl::opt<bool> TraceMem("trace-mem", cl::desc("Print memory read-write operations"));
-cl::opt<bool> TraceReg("trace-reg", cl::desc("Print write operations to registers"));
+cl::opt<bool> TraceMem("trace-mem",
+                       cl::desc("Print memory read-write operations"));
+cl::opt<bool> TraceReg("trace-reg",
+                       cl::desc("Print write operations to registers"));
 
 class Simulator {
   reg_t RegFile[REG_COUNT] = {};
   std::vector<std::byte> Memory;
+  reg_t SimPixelColor;
+  reg_t SimPixelShape;
 
   reg_t getPC() const { return RegFile[REG_PC]; }
   void handleLoad(const Instr &Ins);
@@ -58,6 +63,12 @@ void Simulator::handleLoad(const Instr &Ins) {
     Res = readUintFromMemory(Addr);
   } else if (Addr == MMIO_IO_STDIN) {
     Res = getchar();
+  } else if (Addr == MMIO_SIM_PIXEL_COLOR) {
+    Res = SimPixelColor;
+  } else if (Addr == MMIO_SIM_PIXEL_SHAPE) {
+    Res = SimPixelShape;
+  } else if (Addr == MMIO_SIM_RAND) {
+    Res = sim_rand();
   } else {
     errs() << formatv("TRAP: read from illegal MMIO address {0:x}\n", Addr);
     exit(1);
@@ -78,14 +89,23 @@ void Simulator::handleStore(const Instr &Ins) {
       exit(1);
     }
     memcpy(Memory.data() + Addr, &Value, sizeof(Value));
-    return;
-  }
-  if (Addr == MMIO_IO_STDOUT) {
+  } else if (Addr == MMIO_IO_STDOUT) {
     outs() << static_cast<char>(Value);
-    return;
+  } else if (Addr == MMIO_SIM_CLEAR) {
+    sim_clear(Value);
+  } else if (Addr == MMIO_SIM_DISPLAY) {
+    sim_display();
+  } else if (Addr == MMIO_SIM_PIXEL_COLOR) {
+    SimPixelColor = Value;
+  } else if (Addr == MMIO_SIM_PIXEL_SHAPE) {
+    SimPixelShape = Value;
+  } else if (Addr == MMIO_SIM_SET_PIXEL) {
+    sim_set_pixel((Value >> 16) & 0xffff, Value & 0xffff, SimPixelColor,
+                  static_cast<sim_shape_t>(SimPixelShape));
+  } else {
+    errs() << formatv("TRAP: write to illegal MMIO address {0:x}\n", Addr);
+    exit(1);
   }
-  errs() << formatv("TRAP: write to illegal MMIO address {0:x}\n", Addr);
-  exit(1);
 }
 
 void Simulator::run(const std::vector<Instr> &Instrs) {
@@ -97,6 +117,8 @@ void Simulator::run(const std::vector<Instr> &Instrs) {
   if (StackAddr < BinarySize)
     errs() << "Warning: stack overlaps binary\n";
 
+  SimPixelColor = 0xffffffff;
+  SimPixelShape = 32;
   memset(RegFile, 0, sizeof(RegFile));
   Memory.resize(MemorySize);
   RegFile[REG_BP] = RegFile[REG_SP] = StackAddr;    // initialize rsp and rbp
@@ -161,10 +183,13 @@ void Simulator::run(const std::vector<Instr> &Instrs) {
       writeReg(Ins.r1(), RegFile[Ins.r2()] % Ins.imm());
       break;
     case OPCODE_SLT:
-      writeReg(Ins.r1(), ((int32_t) RegFile[Ins.r2()] < (int32_t) RegFile[Ins.r3()]) ? 1 : 0);
+      writeReg(Ins.r1(),
+               ((int32_t)RegFile[Ins.r2()] < (int32_t)RegFile[Ins.r3()]) ? 1
+                                                                         : 0);
       break;
     case OPCODE_SLTI:
-      writeReg(Ins.r1(), ((int32_t) RegFile[Ins.r2()] < (int32_t) Ins.imm()) ? 1 : 0);
+      writeReg(Ins.r1(),
+               ((int32_t)RegFile[Ins.r2()] < (int32_t)Ins.imm()) ? 1 : 0);
       break;
     case OPCODE_SLTU:
       writeReg(Ins.r1(), (RegFile[Ins.r2()] < RegFile[Ins.r3()]) ? 1 : 0);
@@ -183,38 +208,39 @@ void Simulator::run(const std::vector<Instr> &Instrs) {
       break;
     case OPCODE_BEQ:
       if (RegFile[Ins.r1()] == RegFile[Ins.r2()])
-        NextPC = PC + ((int32_t) Ins.imm()) * 4;
+        NextPC = PC + ((int32_t)Ins.imm()) * 4;
       break;
     case OPCODE_BNE:
       if (RegFile[Ins.r1()] != RegFile[Ins.r2()])
-        NextPC = PC + ((int32_t) Ins.imm()) * 4;
+        NextPC = PC + ((int32_t)Ins.imm()) * 4;
       break;
     case OPCODE_BGT:
-      if ((int32_t) RegFile[Ins.r1()] > (int32_t) RegFile[Ins.r2()])
-        NextPC = PC + ((int32_t) Ins.imm()) * 4;
+      if ((int32_t)RegFile[Ins.r1()] > (int32_t)RegFile[Ins.r2()])
+        NextPC = PC + ((int32_t)Ins.imm()) * 4;
       break;
     case OPCODE_BGE:
-      if ((int32_t) RegFile[Ins.r1()] >= (int32_t) RegFile[Ins.r2()])
-        NextPC = PC + ((int32_t) Ins.imm()) * 4;
+      if ((int32_t)RegFile[Ins.r1()] >= (int32_t)RegFile[Ins.r2()])
+        NextPC = PC + ((int32_t)Ins.imm()) * 4;
       break;
     case OPCODE_BLT:
-      if ((int32_t) RegFile[Ins.r1()] < (int32_t) RegFile[Ins.r2()])
-        NextPC = PC + ((int32_t) Ins.imm()) * 4;
+      if ((int32_t)RegFile[Ins.r1()] < (int32_t)RegFile[Ins.r2()])
+        NextPC = PC + ((int32_t)Ins.imm()) * 4;
       break;
     case OPCODE_BLE:
-      if ((int32_t) RegFile[Ins.r1()] <= (int32_t) RegFile[Ins.r2()])
-        NextPC = PC + ((int32_t) Ins.imm()) * 4;
+      if ((int32_t)RegFile[Ins.r1()] <= (int32_t)RegFile[Ins.r2()])
+        NextPC = PC + ((int32_t)Ins.imm()) * 4;
       break;
     case OPCODE_JALR:
-        NextPC = RegFile[Ins.r2()] + ((int32_t) Ins.imm()) * 4;
-        writeReg(Ins.r1(), PC);
+      NextPC = RegFile[Ins.r2()] + ((int32_t)Ins.imm()) * 4;
+      writeReg(Ins.r1(), PC);
       break;
     default:
       errs() << "Unhandled instruction " << Ins.getMnemonic() << "\n";
       exit(1);
     };
     if (NextPC >= Memory.size()) {
-      errs() << formatv("TRAP: branch or jump at illegal address {0:x}\n", NextPC);
+      errs() << formatv("TRAP: branch or jump at illegal address {0:x}\n",
+                        NextPC);
       exit(1);
     }
     RegFile[REG_PC] = NextPC;
