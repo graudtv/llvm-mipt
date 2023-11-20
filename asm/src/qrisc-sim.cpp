@@ -119,6 +119,7 @@ void Simulator::run(const std::vector<Instr> &Instrs) {
   SimPixelColor = 0xffffffff;
   SimPixelShape = 32;
   memset(RegFile, 0, sizeof(RegFile));
+  Memory.clear();
   Memory.resize(MemorySize);
   RegFile[REG_BP] = RegFile[REG_SP] = StackAddr;    // initialize rsp and rbp
   memcpy(Memory.data(), Instrs.data(), BinarySize); // load binary to memory

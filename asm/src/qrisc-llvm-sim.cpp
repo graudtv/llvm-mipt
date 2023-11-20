@@ -35,7 +35,7 @@ reg_t SimPixelShape = 0;
 
 void handleStore(uint32_t Value, uint32_t Addr) {
   if (TraceMem)
-    outs() << formatv("write {0:x} -> [ {1:x} ]\n", Value, Addr);
+    errs() << formatv("MEM: write {0:x} -> [ {1:x} ]\n", Value, Addr);
   if ((Addr & MMIO_MASK) != MMIO_MASK) {
     if (Addr >= SimMemory.size()) {
       errs() << formatv("TRAP: write to illegal address {0:x}\n", Addr);
@@ -185,10 +185,10 @@ void simulate(const std::vector<Instr> &Instrs) {
                Builder.CreateURem(readReg(Ins.r2()), readReg(Ins.r3())));
     } else if (Opcode == OPCODE_SLT) {
       Value *Cmp = Builder.CreateICmpSLT(readReg(Ins.r1()), readReg(Ins.r2()));
-      writeReg(Ins.r1(), Builder.CreateSExt(Cmp, Builder.getInt32Ty()));
+      writeReg(Ins.r1(), Builder.CreateZExt(Cmp, Builder.getInt32Ty()));
     } else if (Opcode == OPCODE_SLTU) {
       Value *Cmp = Builder.CreateICmpULT(readReg(Ins.r1()), readReg(Ins.r2()));
-      writeReg(Ins.r1(), Builder.CreateSExt(Cmp, Builder.getInt32Ty()));
+      writeReg(Ins.r1(), Builder.CreateZExt(Cmp, Builder.getInt32Ty()));
     } else if (Opcode == OPCODE_ADDI) {
       writeReg(Ins.r1(), Builder.CreateAdd(readReg(Ins.r2()),
                                            Builder.getInt32(Ins.imm())));
@@ -216,11 +216,11 @@ void simulate(const std::vector<Instr> &Instrs) {
     } else if (Opcode == OPCODE_SLTI) {
       Value *Cmp =
           Builder.CreateICmpSLT(readReg(Ins.r1()), Builder.getInt32(Ins.imm()));
-      writeReg(Ins.r1(), Builder.CreateSExt(Cmp, Builder.getInt32Ty()));
+      writeReg(Ins.r1(), Builder.CreateZExt(Cmp, Builder.getInt32Ty()));
     } else if (Opcode == OPCODE_SLTIU) {
       Value *Cmp =
           Builder.CreateICmpULT(readReg(Ins.r1()), Builder.getInt32(Ins.imm()));
-      writeReg(Ins.r1(), Builder.CreateSExt(Cmp, Builder.getInt32Ty()));
+      writeReg(Ins.r1(), Builder.CreateZExt(Cmp, Builder.getInt32Ty()));
     } else if (Opcode == OPCODE_LUI) {
       Value *ShiftedImm =
           Builder.CreateShl(Builder.getInt32(Ins.imm()), Builder.getInt32(16));
@@ -284,6 +284,17 @@ void simulate(const std::vector<Instr> &Instrs) {
 
   verifyModule(*M, &errs());
 
+  /* Prepare memory and registers */
+  size_t BinarySize = Instrs.size() * sizeof(Instr);
+  SimPixelColor = 0xffffffff;
+  SimPixelShape = 32;
+  memset(SimRegFile, 0, sizeof(SimRegFile));
+  SimMemory.clear();
+  SimMemory.resize(MemorySize);
+  SimRegFile[REG_BP] = SimRegFile[REG_SP] = StackAddr; // initialize rsp and rbp
+  memcpy(SimMemory.data(), Instrs.data(), BinarySize); // load binary to memory
+
+  /* Prepare and run ExecutionEngine */
   InitializeNativeTarget();
   InitializeNativeTargetAsmPrinter();
   ExecutionEngine *EE =
