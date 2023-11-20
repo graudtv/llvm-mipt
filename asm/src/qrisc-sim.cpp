@@ -1,5 +1,4 @@
 #include "Assembler.h"
-#include "Simulator.h"
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/FormatVariadic.h>
 #include <llvm/Support/raw_ostream.h>
@@ -12,14 +11,14 @@ cl::OptionCategory Options("Simulator options");
 cl::opt<std::string> InputFilename(cl::Positional, cl::desc("<input file>"),
                                    cl::Required, cl::cat(Options));
 cl::opt<unsigned> MemorySize("memory-size", cl::desc("RAM size in bytes"),
-                             cl::init(512 * 1024));
+                             cl::init(512 * 1024), cl::cat(Options));
 cl::opt<unsigned> StackAddr("stack-addr", cl::desc("Stack address"),
-                            cl::init(16 * 1024));
-cl::opt<bool> Trace("trace", cl::desc("Print all executed instructions"));
+                            cl::init(16 * 1024), cl::cat(Options));
+cl::opt<bool> Trace("trace", cl::desc("Print all executed instructions"), cl::cat(Options));
 cl::opt<bool> TraceMem("trace-mem",
-                       cl::desc("Print memory read-write operations"));
+                       cl::desc("Print memory read-write operations"), cl::cat(Options));
 cl::opt<bool> TraceReg("trace-reg",
-                       cl::desc("Print write operations to registers"));
+                       cl::desc("Print write operations to registers"), cl::cat(Options));
 
 class Simulator {
   reg_t RegFile[REG_COUNT] = {};

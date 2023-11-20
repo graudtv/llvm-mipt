@@ -50,3 +50,13 @@ add_executable(qrisc-sim
 )
 target_compile_definitions(qrisc-sim PRIVATE ${LLVM_DEFINITIONS_LIST})
 target_link_libraries(qrisc-sim LLVMCore sim)
+
+# qrisc-llvm-sim
+add_executable(qrisc-llvm-sim
+  src/qrisc-llvm-sim.cpp
+  src/Assembler.cpp
+  ${FLEX_lexer_OUTPUTS}
+  ${BISON_parser_OUTPUTS}
+)
+target_compile_definitions(qrisc-llvm-sim PRIVATE ${LLVM_DEFINITIONS_LIST})
+target_link_libraries(qrisc-llvm-sim LLVM sim)
