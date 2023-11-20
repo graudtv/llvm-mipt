@@ -183,6 +183,12 @@ void simulate(const std::vector<Instr> &Instrs) {
     } else if (Opcode == OPCODE_REMU) {
       writeReg(Ins.r1(),
                Builder.CreateURem(readReg(Ins.r2()), readReg(Ins.r3())));
+    } else if (Opcode == OPCODE_SLT) {
+      Value *Cmp = Builder.CreateICmpSLT(readReg(Ins.r1()), readReg(Ins.r2()));
+      writeReg(Ins.r1(), Builder.CreateSExt(Cmp, Builder.getInt32Ty()));
+    } else if (Opcode == OPCODE_SLTU) {
+      Value *Cmp = Builder.CreateICmpULT(readReg(Ins.r1()), readReg(Ins.r2()));
+      writeReg(Ins.r1(), Builder.CreateSExt(Cmp, Builder.getInt32Ty()));
     } else if (Opcode == OPCODE_ADDI) {
       writeReg(Ins.r1(), Builder.CreateAdd(readReg(Ins.r2()),
                                            Builder.getInt32(Ins.imm())));
@@ -207,6 +213,14 @@ void simulate(const std::vector<Instr> &Instrs) {
     } else if (Opcode == OPCODE_REMIU) {
       writeReg(Ins.r1(), Builder.CreateURem(readReg(Ins.r2()),
                                             Builder.getInt32(Ins.imm())));
+    } else if (Opcode == OPCODE_SLTI) {
+      Value *Cmp =
+          Builder.CreateICmpSLT(readReg(Ins.r1()), Builder.getInt32(Ins.imm()));
+      writeReg(Ins.r1(), Builder.CreateSExt(Cmp, Builder.getInt32Ty()));
+    } else if (Opcode == OPCODE_SLTIU) {
+      Value *Cmp =
+          Builder.CreateICmpULT(readReg(Ins.r1()), Builder.getInt32(Ins.imm()));
+      writeReg(Ins.r1(), Builder.CreateSExt(Cmp, Builder.getInt32Ty()));
     } else if (Opcode == OPCODE_LUI) {
       Value *ShiftedImm =
           Builder.CreateShl(Builder.getInt32(Ins.imm()), Builder.getInt32(16));
@@ -233,8 +247,13 @@ void simulate(const std::vector<Instr> &Instrs) {
       BranchCond = Builder.CreateICmpSLT(readReg(Ins.r1()), readReg(Ins.r2()));
     } else if (Opcode == OPCODE_BLE) {
       BranchCond = Builder.CreateICmpSLE(readReg(Ins.r1()), readReg(Ins.r2()));
-    } else if (Opcode != OPCODE_JALR) {
-      errs() << "Warning: unhandled instruction " << Ins.getMnemonic() << "\n";
+    } else if (Opcode == OPCODE_JALR) {
+      /* processed below */
+    } else {
+      assert((Ins.getType() == InstrType::Invalid) &&
+             "valid instruction was not handled");
+      /* Invalid instructions are silently ignored, because the may define
+       * static data (e.g. via .word macros from assembly) */
     }
 
     /* Handle control flow */
