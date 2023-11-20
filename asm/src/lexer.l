@@ -53,6 +53,9 @@ blt|BLT         { yylval.opcode = OPCODE_BLT; return TK_I_INSTR; }
 ble|BLE         { yylval.opcode = OPCODE_BLE; return TK_I_INSTR; }
 jalr|JALR       { yylval.opcode = OPCODE_JALR; return TK_I_INSTR; }
 
+  /* assembler macros */
+.word           { return TK_MACRO_WORD; }
+
   /* numeric literals */
 0x[0-9a-fA-F]+  {yylval.imm = strtol(yytext, nullptr, 16); return TK_IMM; }
 [-]?[0-9]+      {yylval.imm = atoi(yytext); return TK_IMM; }

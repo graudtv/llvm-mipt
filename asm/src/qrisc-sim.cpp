@@ -235,7 +235,7 @@ void Simulator::run(const std::vector<Instr> &Instrs) {
       writeReg(Ins.r1(), PC);
       break;
     default:
-      errs() << "Unhandled instruction " << Ins.getMnemonic() << "\n";
+      errs() << formatv("TRAP: illegal opcode {0:x}\n", Ins.getOpcode());
       exit(1);
     };
     if (NextPC >= Memory.size()) {

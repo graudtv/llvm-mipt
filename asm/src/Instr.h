@@ -26,12 +26,7 @@ enum : unsigned {
 };
 
 /* Register indices */
-enum : unsigned {
-  REG_ZERO = 0,
-  REG_SP = 29,
-  REG_BP = 30,
-  REG_PC = 31
-};
+enum : unsigned { REG_ZERO = 0, REG_SP = 29, REG_BP = 30, REG_PC = 31 };
 
 /* MMIO addresses */
 enum : unsigned {
@@ -82,7 +77,7 @@ enum : unsigned {
   OPCODE_JALR = 0x2e,
 };
 
-enum class InstrType { R, SI, UI };
+enum class InstrType { Invalid, R, SI, UI };
 
 inline InstrType getInstrType(opcode_t opcode) {
   switch (opcode) {
@@ -122,7 +117,7 @@ inline InstrType getInstrType(opcode_t opcode) {
   case OPCODE_STORE:
     return InstrType::UI;
   }
-  assert(0 && "invalid opcode");
+  return InstrType::Invalid;
 }
 
 inline const char *getInstrMnemonic(opcode_t opcode) {
@@ -164,10 +159,10 @@ inline const char *getInstrMnemonic(opcode_t opcode) {
 }
 
 class Instr {
-  uint32_t Ins;
+  instr_t Ins;
 
 public:
-  Instr(uint32_t I) : Ins(I) {}
+  Instr(instr_t I) : Ins(I) {}
 
   static Instr makeRInstr(opcode_t opcode, reg_t r1, reg_t r2, reg_t r3) {
     assert(!(r1 & ~INSTR_R_MASK) && "register out of bounds");
@@ -210,8 +205,22 @@ public:
     return (Imm & MSB) ? (~INSTR_IMM_MASK | Imm) : Imm;
   }
 
+  instr_t getEncoding() const { return Ins; }
+
+  bool isJump() const { return getOpcode() == OPCODE_JALR; }
+  bool isBranch() const {
+    opcode_t Opcode = getOpcode();
+    return Opcode == OPCODE_BEQ || Opcode == OPCODE_BNE ||
+           Opcode == OPCODE_BGT || Opcode == OPCODE_BGE ||
+           Opcode == OPCODE_BLT || Opcode == OPCODE_BLE;
+  }
+
   void print(std::ostream &Os = std::cout) const {
     auto Type = getType();
+    if (Type == InstrType::Invalid) {
+      Os << ".word 0x" << std::hex << getEncoding() << std::dec << std::endl;
+      return;
+    }
     Os << getMnemonic() << " r" << r1() << ", r" << r2();
     if (Type == InstrType::R)
       Os << ", r" << r3();

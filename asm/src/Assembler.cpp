@@ -71,6 +71,8 @@ void Assembler::appendIInstr(opcode_t opcode, reg_t r1, reg_t r2,
   Instrs.push_back(Instr::makeIInstr(opcode, r1, r2, 0));
 }
 
+void Assembler::appendWord(instr_t I) { Instrs.push_back(I); }
+
 void Assembler::finalize() {
   for (auto &UL : UnresolvedLabels) {
     Instr &User = Instrs[UL.InstrIdx];
@@ -80,7 +82,9 @@ void Assembler::finalize() {
                 << ": undefined label '" << UL.Label << "'" << std::endl;
       exit(1);
     }
-    unsigned Imm = It->second - UL.InstrIdx;
+    simm_t Imm = It->second - UL.InstrIdx;
+    if (!(User.isJump() || User.isBranch()))
+      Imm *= 4;
     User = Instr::makeIInstr(User.getOpcode(), User.r1(), User.r2(), Imm);
   }
 }

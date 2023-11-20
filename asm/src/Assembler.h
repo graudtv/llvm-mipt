@@ -41,6 +41,7 @@ public:
   void appendRInstr(opcode_t opcode, reg_t r1, reg_t r2, reg_t r3);
   void appendIInstr(opcode_t opcode, reg_t r1, reg_t r2, imm_t imm);
   void appendIInstr(opcode_t opcode, reg_t r1, reg_t r2, const char *label);
+  void appendWord(instr_t I);
   void finalize();
 };
 

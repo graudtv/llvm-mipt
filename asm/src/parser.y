@@ -29,6 +29,7 @@ qrisc::Assembler &Asm = qrisc::Assembler::getInstance();
 %token<opcode> TK_I_INSTR "i-instr";
 %token<imm> TK_IMM "immediate value";
 %token<reg> TK_REG "register name";
+%token TK_MACRO_WORD ".word";
 
 %start program
 
@@ -37,7 +38,7 @@ qrisc::Assembler &Asm = qrisc::Assembler::getInstance();
 program: instr_list
          { Asm.finalize(); }
 instr_list: instr instr_list | %empty;
-instr: r_instr | i_instr | label | TK_NEWLINE;
+instr: r_instr | i_instr | label | macro | TK_NEWLINE;
 
 r_instr: TK_R_INSTR TK_REG TK_COMMA TK_REG TK_COMMA TK_REG
          { Asm.appendRInstr($1, $2, $4, $6); }
@@ -47,6 +48,10 @@ i_instr: TK_I_INSTR TK_REG TK_COMMA TK_REG TK_COMMA TK_IDENTIFIER
          { Asm.appendIInstr($1, $2, $4, $6); free($6); }
 label: TK_IDENTIFIER TK_COLON
          { Asm.appendLabel($1); free($1); }
+macro: macro_word
+
+macro_word: TK_MACRO_WORD TK_IMM
+         { Asm.appendWord($2); }
 
 %%
 
