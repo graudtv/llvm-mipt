@@ -99,12 +99,24 @@ void simulate(const std::vector<Instr> &Instrs) {
 
   ArrayType *RegFileTy = ArrayType::get(Builder.getInt32Ty(), REG_COUNT);
   Value *RegFile = M->getOrInsertGlobal("__reg_file", RegFileTy);
+  reg_t InstrPC = 0;
 
   auto getRegPtr = [&Builder, RegFile, RegFileTy](reg_t Idx) -> Value * {
     return Builder.CreateConstInBoundsGEP2_32(RegFileTy, RegFile, 0, Idx);
   };
-  auto getReg = [&](reg_t Idx) -> Value * {
+  auto readReg = [&](unsigned Idx) -> Value * {
+    assert(Idx < REG_COUNT && "invalid index");
+    if (Idx == REG_ZERO)
+      return Builder.getInt32(0);
+    if (Idx == REG_PC)
+      return Builder.getInt32(InstrPC);
     return Builder.CreateLoad(Builder.getInt32Ty(), getRegPtr(Idx));
+  };
+  auto writeReg = [&](unsigned Idx, Value *V) {
+    assert(Idx < REG_COUNT && "invalid index");
+    if (Idx == REG_ZERO) // writes to zero reg are ignored
+      return;
+    Builder.CreateStore(V, getRegPtr(Idx));
   };
 
   // declare void @__builtin_store(i32 %value, i32 %addr)
@@ -120,46 +132,128 @@ void simulate(const std::vector<Instr> &Instrs) {
   FunctionType *MainFuncTy = FunctionType::get(Builder.getVoidTy(), false);
   Function *MainFunc =
       Function::Create(MainFuncTy, Function::ExternalLinkage, "main", M.get());
-  BasicBlock *Entry = BasicBlock::Create(Ctx, "entry", MainFunc);
-  Builder.SetInsertPoint(Entry);
+  BasicBlock *BBEntry = BasicBlock::Create(Ctx, "entry", MainFunc);
+  Builder.SetInsertPoint(BBEntry);
 
+  /* Possible branch/jump destination address -> associated BasicBlock */
+  std::unordered_map<uint32_t, BasicBlock *> BBJumpDest;
+  BBJumpDest[0] = BBEntry;
+  /* Gather information on jump and branches */
+  for (auto Ins : Instrs) {
+    if (Ins.isJump() && (Ins.r1() != REG_ZERO || Ins.r2() != REG_PC)) {
+      errs() << "jalr with non-zero link register or non PC-relative jump "
+                "address is not supported";
+      exit(1);
+    }
+    if (Ins.isBranch() || Ins.isJump()) {
+      uint32_t Addr = InstrPC + static_cast<simm_t>(Ins.imm()) * 4;
+      if (!BBJumpDest[Addr])
+        BBJumpDest[Addr] = BasicBlock::Create(Ctx, "bb", MainFunc);
+      if (!BBJumpDest[InstrPC + 4])
+        BBJumpDest[InstrPC + 4] = BasicBlock::Create(Ctx, "bb_cont", MainFunc);
+    }
+    InstrPC += 4;
+  }
+
+  InstrPC = 0;
   for (auto Ins : Instrs) {
     auto Opcode = Ins.getOpcode();
+    Value *BranchCond = nullptr;
     if (Opcode == OPCODE_ADD) {
-      Value *V = Builder.CreateAdd(getReg(Ins.r2()), getReg(Ins.r3()));
-      Builder.CreateStore(V, getRegPtr(Ins.r1()));
+      writeReg(Ins.r1(),
+               Builder.CreateAdd(readReg(Ins.r2()), readReg(Ins.r3())));
     } else if (Opcode == OPCODE_AND) {
-      Value *V = Builder.CreateAnd(getReg(Ins.r2()), getReg(Ins.r3()));
-      Builder.CreateStore(V, getRegPtr(Ins.r1()));
+      writeReg(Ins.r1(),
+               Builder.CreateAnd(readReg(Ins.r2()), readReg(Ins.r3())));
     } else if (Opcode == OPCODE_OR) {
-      Value *V = Builder.CreateOr(getReg(Ins.r2()), getReg(Ins.r3()));
-      Builder.CreateStore(V, getRegPtr(Ins.r1()));
+      writeReg(Ins.r1(),
+               Builder.CreateOr(readReg(Ins.r2()), readReg(Ins.r3())));
     } else if (Opcode == OPCODE_XOR) {
-      Value *V = Builder.CreateXor(getReg(Ins.r2()), getReg(Ins.r3()));
-      Builder.CreateStore(V, getRegPtr(Ins.r1()));
+      writeReg(Ins.r1(),
+               Builder.CreateXor(readReg(Ins.r2()), readReg(Ins.r3())));
+    } else if (Opcode == OPCODE_SUB) {
+      writeReg(Ins.r1(),
+               Builder.CreateSub(readReg(Ins.r2()), readReg(Ins.r3())));
+    } else if (Opcode == OPCODE_MUL) {
+      writeReg(Ins.r1(),
+               Builder.CreateMul(readReg(Ins.r2()), readReg(Ins.r3())));
+    } else if (Opcode == OPCODE_DIVU) {
+      writeReg(Ins.r1(),
+               Builder.CreateUDiv(readReg(Ins.r2()), readReg(Ins.r3())));
     } else if (Opcode == OPCODE_REMU) {
-      Value *V = Builder.CreateURem(getReg(Ins.r2()), getReg(Ins.r3()));
-      Builder.CreateStore(V, getRegPtr(Ins.r1()));
+      writeReg(Ins.r1(),
+               Builder.CreateURem(readReg(Ins.r2()), readReg(Ins.r3())));
     } else if (Opcode == OPCODE_ADDI) {
-      Value *V =
-          Builder.CreateAdd(getReg(Ins.r2()), Builder.getInt32(Ins.imm()));
-      Builder.CreateStore(V, getRegPtr(Ins.r1()));
+      writeReg(Ins.r1(), Builder.CreateAdd(readReg(Ins.r2()),
+                                           Builder.getInt32(Ins.imm())));
+    } else if (Opcode == OPCODE_ANDI) {
+      writeReg(Ins.r1(), Builder.CreateAnd(readReg(Ins.r2()),
+                                           Builder.getInt32(Ins.imm())));
     } else if (Opcode == OPCODE_ORI) {
-      Value *V =
-          Builder.CreateOr(getReg(Ins.r2()), Builder.getInt32(Ins.imm()));
-      Builder.CreateStore(V, getRegPtr(Ins.r1()));
+      writeReg(Ins.r1(), Builder.CreateOr(readReg(Ins.r2()),
+                                          Builder.getInt32(Ins.imm())));
+    } else if (Opcode == OPCODE_XORI) {
+      writeReg(Ins.r1(), Builder.CreateXor(readReg(Ins.r2()),
+                                           Builder.getInt32(Ins.imm())));
+    } else if (Opcode == OPCODE_SUBI) {
+      writeReg(Ins.r1(), Builder.CreateSub(readReg(Ins.r2()),
+                                           Builder.getInt32(Ins.imm())));
+    } else if (Opcode == OPCODE_MULI) {
+      writeReg(Ins.r1(), Builder.CreateMul(readReg(Ins.r2()),
+                                           Builder.getInt32(Ins.imm())));
+    } else if (Opcode == OPCODE_DIVIU) {
+      writeReg(Ins.r1(), Builder.CreateUDiv(readReg(Ins.r2()),
+                                            Builder.getInt32(Ins.imm())));
+    } else if (Opcode == OPCODE_REMIU) {
+      writeReg(Ins.r1(), Builder.CreateURem(readReg(Ins.r2()),
+                                            Builder.getInt32(Ins.imm())));
     } else if (Opcode == OPCODE_LUI) {
-      Value *Shifted =
+      Value *ShiftedImm =
           Builder.CreateShl(Builder.getInt32(Ins.imm()), Builder.getInt32(16));
-      Value *V = Builder.CreateOr(getReg(Ins.r2()), Shifted);
-      Builder.CreateStore(V, getRegPtr(Ins.r1()));
+      Value *Mask = Builder.getInt32(0xffff);
+      Value *LowerBits = Builder.CreateAnd(readReg(Ins.r2()), Mask);
+      writeReg(Ins.r1(), Builder.CreateOr(LowerBits, ShiftedImm));
+    } else if (Opcode == OPCODE_LOAD) {
+      Value *Addr =
+          Builder.CreateAdd(readReg(Ins.r2()), Builder.getInt32(Ins.imm()));
+      writeReg(Ins.r1(), Builder.CreateCall(LazyLoad, Addr));
     } else if (Opcode == OPCODE_STORE) {
       Value *Addr =
-          Builder.CreateAdd(getReg(Ins.r2()), Builder.getInt32(Ins.imm()));
-      Value *V = Builder.CreateCall(LazyStore, {getReg(Ins.r1()), Addr});
-    } else {
-      errs() << "Unhandled instruction " << Ins.getMnemonic() << "\n";
+          Builder.CreateAdd(readReg(Ins.r2()), Builder.getInt32(Ins.imm()));
+      Builder.CreateCall(LazyStore, {readReg(Ins.r1()), Addr});
+    } else if (Opcode == OPCODE_BEQ) {
+      BranchCond = Builder.CreateICmpEQ(readReg(Ins.r1()), readReg(Ins.r2()));
+    } else if (Opcode == OPCODE_BEQ) {
+      BranchCond = Builder.CreateICmpNE(readReg(Ins.r1()), readReg(Ins.r2()));
+    } else if (Opcode == OPCODE_BGT) {
+      BranchCond = Builder.CreateICmpSGT(readReg(Ins.r1()), readReg(Ins.r2()));
+    } else if (Opcode == OPCODE_BGE) {
+      BranchCond = Builder.CreateICmpSGE(readReg(Ins.r1()), readReg(Ins.r2()));
+    } else if (Opcode == OPCODE_BLT) {
+      BranchCond = Builder.CreateICmpSLT(readReg(Ins.r1()), readReg(Ins.r2()));
+    } else if (Opcode == OPCODE_BLE) {
+      BranchCond = Builder.CreateICmpSLE(readReg(Ins.r1()), readReg(Ins.r2()));
+    } else if (Opcode != OPCODE_JALR) {
+      errs() << "Warning: unhandled instruction " << Ins.getMnemonic() << "\n";
     }
+
+    /* Handle control flow */
+    if (BranchCond) {
+      assert(Ins.isBranch());
+      uint32_t JumpAddr = InstrPC + static_cast<simm_t>(Ins.imm()) * 4;
+      BasicBlock *TrueBranch = BBJumpDest[JumpAddr];
+      BasicBlock *FalseBranch = BBJumpDest[InstrPC + 4];
+      Builder.CreateCondBr(BranchCond, TrueBranch, FalseBranch);
+      Builder.SetInsertPoint(FalseBranch);
+    } else if (Ins.isJump()) {
+      uint32_t JumpAddr = InstrPC + static_cast<simm_t>(Ins.imm()) * 4;
+      Builder.CreateBr(BBJumpDest[JumpAddr]);
+      Builder.SetInsertPoint(BBJumpDest[InstrPC + 4]);
+    } else if (auto *BBNext = BBJumpDest[InstrPC + 4]) {
+      Builder.CreateBr(BBNext);
+      Builder.SetInsertPoint(BBNext);
+    }
+    InstrPC += 4;
   }
   Builder.CreateRetVoid();
 

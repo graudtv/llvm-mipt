@@ -97,7 +97,7 @@ description: binary operation on register and immediate
 ```
 opcode: lui
 type: I
-semantics: r1 = r2 | (zero_extend(imm) & 0x00ff << 16)
+semantics: r1 = (r2 & 0xffff) | (zero_extend(imm) << 16)
 description: set 16 upper bits to imm
 ```
 

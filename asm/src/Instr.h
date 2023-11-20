@@ -153,9 +153,8 @@ inline const char *getInstrMnemonic(opcode_t opcode) {
   case OPCODE_BLT: return "blt";
   case OPCODE_BLE: return "ble";
   case OPCODE_JALR: return "jalr";
+  default: return ".word";
   }
-  // clang-format on
-  assert(0 && "invalid opcode");
 }
 
 class Instr {
