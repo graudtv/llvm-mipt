@@ -51,6 +51,12 @@ Features:
 
 Opcodes 0x30-0x3f reserved for future extensions.
 
+```
+TODO: remove subi, it's useless
+TODO: Add shift operations
+TODO: Add branch instructions for unsigned operands
+```
+
 ### Instruction Types
 ```
 R(egister) type
@@ -81,7 +87,7 @@ description: binary operation on 2 registers
 ```
 
 ```
-opcodes: addi, ori, andi, xori, subi, muli, diviu, remiu, slti
+opcodes: addi, ori, andi, xori, subi, muli, diviu, slti
 type: I
 semantics: r1 = r2 <op> sign_extend(imm)
 description: binary operation on register and immediate
@@ -157,8 +163,8 @@ description: unconditional indirect jump by signed offset
 
 ### External devices
 
-External devices can be accessed via MMIO with any memory instruction: load,
-store, addm, orm, etc. Addresses 0xffffff00-0xffffffff are reserved for MMIO.
+External devices can be accessed via MMIO with load and store instructions.
+Addresses 0xffffff00-0xffffffff are reserved for MMIO.
 
 In write operations to registers in descriptions below, it is assumed that
 "arg" is 32-bit value written to register.
@@ -237,6 +243,7 @@ label:
 ```
 
 ##### Pseudo intructions
+
 ```
 | pseudo instr    |       equivalent       |
 |-----------------|------------------------|
