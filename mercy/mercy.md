@@ -10,25 +10,24 @@ Main features:
 
 ### Table of contents
 - [Syntax and semantics overview](#syntax-and-semantics-overview)
-    * [Translation Unit](#translation-unit)
-    * [Declaration](#declaration)
-    * [Generic expression](#generic-expression)
-    * [Type expression](#type-expression)
-    * [Builtin type](#builtin-type)
-    * [Function type expression](#function-type-expression)
-    * [Expression](#expression)
-    * [Arithmetic expression](#arithmetic-expression)
-    * [Extern expression](#extern-expression)
-    * [Block expression](#block-expression)
-    * [Type conversions](#type-conversions)
+    + [Translation Unit](#translation-unit)
+    + [Declaration](#declaration)
+    + [Expression](#expression)
+    + [Type expression](#type-expression)
+    + [Builtin type](#builtin-type)
+    + [Function type expression](#function-type-expression)
+    + [Array type expression](#array-type-expression)
+    + [Block expression](#block-expression)
+    + [Extern expression](#extern-expression)
+    + [Constructors](#constructors)
+    + [Memory management](#memory-management)
 - [Full grammar](#full-grammar)
-    * [Lexer grammar](#lexer-grammar)
-    * [Parser grammar](#parser-grammar)
+    + [Lexer grammar](#lexer-grammar)
+    + [Parser grammar](#parser-grammar)
 - [TODO](#todo)
-    * [Memory and arrays](#memory-and-arrays)
-    * [Strings](#strings)
-    * [Operations on types](#operations-on-types)
-    * [Control flow](#control-flow)
+    + [Strings](#strings)
+    + [Operations on types](#operations-on-types)
+    + [Control flow](#control-flow)
 
 ### Syntax and semantics overview
 As in C/C++, program consists of one or more source files in _Mercy_ language,
@@ -70,12 +69,22 @@ Type of function is deduced based on the parameter count and the type of
 initializer, the latter defining the return type of the function.
 Each function is inherently a template function.
 
-Functions can take arguments by reference, and reference to a variable can
-be declared:
+Expression of primitive type (see _Primitive vs non-primitive types_) is copied
+when assigned to another variable or passed to a function. Expression of
+non-primitive type is assigned or passed by reference (from compiler
+perspective - by pointer to the object)
+
+However, expression of primitive type can also be assigned or passed by
+reference if this is requested explicitly using '&' symbol:
 ```
 let &y = x;
 let increment(&x) = x + 1;
+let swap(&x, &y) = { let tmp = x; x = y; y = tmp; }
 ```
+'&' notation has no effect if assignee expression is of non-primitive type:
+expression is passed by reference, as it would be without '&'. This enables
+the ```swap()``` function above to work with both primitive and non-primitive
+types.
 
 Function can be defined on a specific domain using _when_ keyword. Multiple
 definitions on non-intersecting domains are possible:
@@ -91,13 +100,12 @@ program terminates.
 _Grammar Synopsis_:
 ```
 declaration
-    : "let" identifier "=" expression ";"
+    : "let" identifier "=" generic-expression ";"
     | "let" "&" identifier "=" expression ";"
-    | "let" identifier "=" type-expression ";"
     | "let" identifier "(" optional-function-parameter-list ")" "=" generic-expression ";"
     | "let" identifier "(" optional-function-parameter-list ")" "=" generic-expression "when" expression ";"
 optional-function-parameter-list
-    : function-paramer-list
+    : function-parameter-list
     | %empty
 function-parameter-list
     : function-parameter-list "," function-parameter
@@ -107,98 +115,21 @@ function-parameter
     | "&" identifier
 ```
 
-##### Generic expression
-In some contexts types can be used as usual expressions, e.g. they can be
-passed to a function as an argument. So there is a concept of
-_generic-expression_, which is either a _type-expression_ or _expression_.
-
-_Grammar Synopsis_:
-```
-generic-expression
-    : type-expression
-    | expression
-```
-
-##### Type expression
-_type-exprssion_ is either a _builtin type_ or a _function type expression_.
-
-_Grammar Synopsis_:
-```
-type-expression
-    : builtin-type
-    | function-type-expression
-```
-
-##### Builtin type
-List of builtin types:
-* void
-* bool
-* int, int8, int16, int32, int64
-* uint, uint8, uint16, uint32, uint64
-* uintptr
-
-_int_ and _uint_ are aliases to some _intXX_ and _uintXX_ type. Other types are
-different.
-
-Note. _Mercy_ does not allow implicit conversions, so implicit conversion from
-_bool_ to _uint8_ is not possible. This can be achieved with explicit cast,
-if desired. However, since _int_ and _int32_ (or _int64_, depending on
-architecture) are the same type, no explicit cast required.
-
-Each builtin type has an associated keyword, e.g.:
-```
-let int_type = int32;
-let uint_type = uint32;
-```
-
-_Grammar Synopsis_:
-```
-builtin-type
-    : "void" | "bool"
-    | "int" | "int8" | "int16" | "int32" | "int64"
-    | "uint" | "uint8" | "uint16" | "uint32" | "uint64"
-    | "uintptr"
-```
-
-##### Function type expression
-_function-type-expression_ specifies a function type, i.e. function signature.
-It starts with _function_type_ keyword, followed by the list of types:
-```
-let func_type1 = function_type(void, int, int);
-let func_type2 = function_type(int32);
-```
-The first argument is function return type, the latter zero or more arguments
-are function parameter types.
-
-_Grammar Synopsis_:
-```
-function-type-expression
-    : "function_type" "(" type-list ")"
-type-list
-    : type-list type-expression
-    | type-expression
-```
-
 ##### Expression
+_expression_ is the result of some evaluation. There are 4 ways how an
+expression can be built:
+1. Use of variable, function/operator invokation
+2. _type-expression_
+3. _block-expression_
+4. _extern-expression_
 
-_expression_ is either an _arithmetic-expression_ or _block-expression_.
-
-_Grammar Synopsis_:
-```
-expression
-    : arithmetic-expression
-    | block-expression
-```
-
-##### Arithmetic expression
-
-_arithemetic-expression_ defines regular arithmetic operations and function
-calls. Syntax, semantics and precedence is the same as in C (though not all C
+The 1st option represents usual arithmetic operations and function calls.
+Syntax, semantics and precedence is the same as in C (though not all C
 operators are supported)
 
 | Operators    | Associativity |
 |--------------|---------------|
-| ()           | left to right |
+| () []        | left to right |
 | * / %        | left to right |
 | + -          | left to right |
 | << >>        | left to right |
@@ -210,15 +141,27 @@ operators are supported)
 | &&           | left to right |
 | \|\|         | left to right |
 
-Examples:
+Examples of _expression_-s:
 ```
-let x = a + b;
-func(x, 2 + 2 * 2);
+let x = a + b; // a + b is expression
+func(x, 2 + 2 * 2); // x, 2, 2 * 2, 2 + 2 * 2, func(x, 2 + 2 * 2) are expressions
 ```
+
+_identifier_ used in _expression_ is accessed by reference:
+```
+let x = 0;
+let inc_x() = { x = x + 1 };
+inc_x();
+print(x); // 1
+```
+
+Options 2-4 do not have equivalent in C/C++. See [type
+expression](#type-expression), [block expression](#block-expression) and
+[extern expression](#extern-expression) for details.
 
 _Grammar Synopsis_:
 ```
-arithmetic-expression
+expression
     : logical-or-expression
 logical-or-expression
     : logical-or-expression "||" logical-and-expression
@@ -263,45 +206,100 @@ prefix-expression
     | postfix-expression
 postfix-expression
     : primary-expression "(" ")"
-    | primary-expression "(" function-argument-list ")"
+    | primary-expression "(" expression-list ")"
+    | primary-expression "[" expression "]"
     | primary-expression
 primary-expression
     : identifier
     | numeric-literal
-    | extern-expression
     | "(" expression ")"
+    | type-expression
+    | block-expression
+    | extern-expression
+expression-list
+    : expression-list "," expression
+    | expression
 ```
 
-##### Extern expression
-Symbols defined in other object files (including ones produced from code in
-another language) can be referenced with _extern expression_. The first
-argument of _extern_ is the name of the symbol to be referenced, the second
-is the symbol type.
+##### Type expression
+Unlike C/C++, *Mercy* has unified grammar for operations on types and normal
+values. It provides great opportunities for metaprogramming, for example types
+can be passed to functions as arguments and much more.
 
-Usually _extern expression_ is assigned to a variable using _let_. Though
-it has a high precedence and can also be used inside expressions.
-```
-let print_hex = extern(_print_hex, function_type(void, int32));
-let var = extern(_var, int32);
-print_hex(var);
-
-let &var_ref = extern(_var, int32);
-var_ref *= 2;
-
-let v = 2 + extern(_var, int32) * 2
-```
-
-
-If _extern_ references a function, the domain of the callee is constrained by
-the types specified in _extern expression_ as if a _when_ clause was used.
-
-If type specified in _extern expression_ does not match the actual type of
-the symbol, behaviour is undefined.
+_type-expression_ builds a type. Note that this is not the only way how type
+can occur in some expression: variables can be type aliases and functions can
+return types. However, each type is eventually built by a sequence of
+_type-expression_-s.
 
 _Grammar Synopsis_:
 ```
-extern-expression
-    : "extern" "(" identifier type-expression ")"
+type-expression
+    : builtin-type
+    | function-type-expression
+    | array-type-expression
+```
+
+##### Builtin type
+List of builtin types:
+* void
+* bool
+* int, int8, int16, int32, int64
+* uint, uint8, uint16, uint32, uint64
+* uintptr
+
+_int_ and _uint_ are aliases to some _intXX_ and _uintXX_ type. Other types are
+different.
+
+Note. _Mercy_ does not allow implicit conversions, so implicit conversion from
+_bool_ to _uint8_ is not possible. This can be achieved with explicit cast,
+if desired. However, since _int_ and _int32_ (or _int64_, depending on
+architecture) are the same type, no explicit cast required.
+
+uintptr is a special type which can be used to exchange opaque pointers
+with C code.
+
+Each builtin type has an associated keyword, e.g.:
+```
+let int_type = int32;
+let uint_type = uint32;
+```
+
+_Grammar Synopsis_:
+```
+builtin-type
+    : "void" | "bool"
+    | "int" | "int8" | "int16" | "int32" | "int64"
+    | "uint" | "uint8" | "uint16" | "uint32" | "uint64"
+    | "uintptr"
+```
+
+##### Function type expression
+_function-type-expression_ specifies a function type, i.e. function signature.
+It starts with _function_type_ keyword, followed by the list of types in
+parentheses:
+```
+let func_type1 = function_type(void, int, int);
+let func_type2 = function_type(int32);
+```
+The first argument is function return type, the latter zero or more arguments
+are function parameter types.
+
+_Grammar Synopsis_:
+```
+function-type-expression
+    : "function_type" "(" expression-list ")"
+```
+
+##### Array type expression
+_array-type-expression_ specifies an array type:
+```
+let arr_t = array_type(int32);
+```
+
+_Grammar Synopsis_:
+```
+array-type-expression
+    : "array_type" "(" expression ")"
 ```
 
 ##### Block expression
@@ -334,9 +332,40 @@ statement
     | "return" expression
 ```
 
-##### Type conversions
-Name of a type can be used as a function name to perform a type cast on 
-expression:
+##### Extern expression
+Symbols defined in other object files (including ones produced from code in
+another language) can be referenced with _extern-expression_. The first
+argument of _extern_ is the name of the symbol to be referenced, the second
+is the symbol type.
+
+Usually _extern-expression_ is assigned to a variable using _let_. However,
+it can also be used inside expressions directly.
+```
+let print_hex = extern(_print_hex, function_type(void, int32));
+let var = extern(_var, int32);
+print_hex(var);
+
+let &var_ref = extern(_var, int32);
+var_ref *= 2;
+
+let v = 2 + extern(_var, int32) * 2
+```
+
+If _extern_ references a function, the domain of the callee is constrained by
+the types specified in _extern expression_ as if a _when_ clause was used.
+
+If type specified in _extern expression_ does not match the actual type of
+the symbol, behaviour is undefined.
+
+_Grammar Synopsis_:
+```
+extern-expression
+    : "extern" "(" identifier "," expression ")"
+```
+
+##### Constructors
+Integer type can be used as a function name to construct a type from
+another integer type, i.e. perform a type cast:
 
 ```
 let x = 10;              // x is int
@@ -345,10 +374,51 @@ let uint_type = uint32;
 let z = uint_type(x);    // z is uint32
 ```
 
-From syntactic perspective, this is just a regular function call, so
+Array type can be used to create an array of specific size:
+```
+let arr_t = array_type(int32);
+let arr = arr_t(16); // array of 16 elements
+```
+
+From syntactic perspective, these are just regular function calls, so
 such syntax is already supported by _expression_ hierarchy. Only special
 semantic handling is required.
 
+##### Memory management
+* Any global object is alive from the invokation of main() until the end of
+  execution
+* Currently any non-global object is alive from the point of its
+  definition until the end of the enclosing function.
+
+Compiler may use registers, stack or heap as storage on its own choice, as
+long as the requirements of *Mercy* standard are satisfied and no memory is
+leaked.
+
+Note. The requirement on life time of non-global objects highly constrains
+usage of lambdas and work with memory in general. This issue will be addressed
+in the future.
+```
+// OK, x is primitive and thus copied when returned
+let foo() = { let x = 0; return x; };
+
+// UB: dangling reference. x is destroyed at the end of boo()
+let boo() = { let x = array_type(int32)(16); return x; };
+
+// OK, x is alive until end of bar()
+let bar() {
+  let x = 0;
+  let f() = { print(x); };
+  return f();
+};
+
+// UB: returned lambda has dangling reference to x
+let moo() = {
+  let x = 0;
+  let f() = { print(x); };
+  return f;
+};
+
+```
 
 ### Full grammar
 ##### Lexer grammar
@@ -385,12 +455,10 @@ declaration-list
 declaration
     : "let" identifier "=" expression ";"
     | "let" "&" identifier "=" expression ";"
-    | "let" identifier "=" type-expression ";"
-    | "let" identifier "(" optional-function-parameter-list ")" "=" generic-expression ";"
-    | "let" identifier "(" optional-function-parameter-list ")" "=" generic-expression "when" expression ";"
-
+    | "let" identifier "(" optional-function-parameter-list ")" "=" expression ";"
+    | "let" identifier "(" optional-function-parameter-list ")" "=" expression "when" expression ";"
 optional-function-parameter-list
-    : function-paramer-list
+    : function-parameter-list
     | %empty
 function-parameter-list
     : function-parameter-list "," function-parameter
@@ -399,31 +467,7 @@ function-parameter
     : identifier
     | "&" identifier
 
-generic-expression
-    : type-expression
-    | expression
-
-type-expression
-    : builtin-type
-    | function-type-expression
-
-builtin-type
-    : "void" | "bool"
-    | "int" | "int8" | "int16" | "int32" | "int64"
-    | "uint" | "uint8" | "uint16" | "uint32" | "uint64"
-    | "uintptr"
-
-function-type-expression
-    : "function_type" "(" type-list ")"
-type-list
-    : type-list type-expression
-    | type-expression
-
 expression
-    : arithmetic-expression
-    | block-expression
-
-arithmetic-expression
     : logical-or-expression
 logical-or-expression
     : logical-or-expression "||" logical-and-expression
@@ -468,20 +512,33 @@ prefix-expression
     | postfix-expression
 postfix-expression
     : primary-expression "(" ")"
-    | primary-expression "(" function-argument-list ")"
+    | primary-expression "(" expression-list ")"
+    | primary-expression "[" expression "]"
     | primary-expression
 primary-expression
     : identifier
     | numeric-literal
-    | extern-expression
     | "(" expression ")"
+    | type-expression
+    | block-expression
+    | extern-expression
+expression-list
+    : expression-list "," expression
+    | expression
 
-function-argument-list
-    : function-argument-list "," generic-expression
-    | generic-expression
-
-extern-expression
-    : "extern" "(" identifier type-expression ")"
+type-expression
+    : builtin-type
+    | function-type-expression
+    | array-type-expression
+builtin-type
+    : "void" | "bool"
+    | "int" | "int8" | "int16" | "int32" | "int64"
+    | "uint" | "uint8" | "uint16" | "uint32" | "uint64"
+    | "uintptr"
+function-type-expression
+    : "function_type" "(" expression-list ")"
+array-type-expression
+    : "array_type" "(" expression ")"
 
 block-expression
     : "{" "}"
@@ -494,38 +551,18 @@ statement
     | expression
     | "return" expression
 
+extern-expression
+    : "extern" "(" identifier "," expression ")"
 ```
-
 
 ### TODO
 Thoughts and ideas on future extensions.
 
-##### Memory and arrays
-Generally, _Mercy_ is fully capable of working with memory and data structures
-without any additional language support: these details can be implemented in C
-and imported with _extern_ (potentially automatically, as part of _Mercy_
-standard library):
-```
-let new_array = extern("_new_array", function_type(uintptr, uint));
-let del_array = extern("_del_array", function_type(void, uintptr));
-let array_set = extern("_array_set", function_type(uintptr, uint, int));
-let array_get = extern("_array_get", function_type(int, uint));
-
-let arr = new_array(ARRAY_SIZE);
-array_set(arr, idx, value);
-let elem = array_get(arr, idx);
-del_array(arr);
-```
-
-However, some syntactic sugar would be useful, such as '[]' operator and
-convenient array initialization. These will be addressed in the future and will
-be possibly implemented using OOP paradigm (kind of like numpy in Python).
-
 ##### Strings
-Definetely useful, will be added soon.
+Will be added soon.
 
 ##### Operations on types
-The point of _type-expressions_ is too allow something like this:
+The point of expressions with types is too allow something like this:
 ```
 let sizeof(type) = type.size;
 let sz = sizeof(int32); // sz = 4
