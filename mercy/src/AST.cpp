@@ -48,10 +48,14 @@ void IntegralLiteral::print(llvm::raw_ostream &Os, unsigned Shift) const {
 }
 
 void BinaryOperator::print(llvm::raw_ostream &Os, unsigned Shift) const {
-  Os << tabulate(Shift) << "BinaryOperator '" << getBinaryOpKindStr(Kind)
+  Os << tabulate(Shift) << "BinaryOperator '" << getMnemonic()
      << "'\n";
   LHS->print(Os, Shift + 1);
   RHS->print(Os, Shift + 1);
+}
+
+const char *BinaryOperator::getMnemonic() const {
+  return getBinaryOpKindStr(Kind);
 }
 
 void UnaryOperator::print(llvm::raw_ostream &Os, unsigned Shift) const {
@@ -77,4 +81,10 @@ void FunctionCall::print(llvm::raw_ostream &Os, unsigned Shift) const {
     Callee->print(Os, Shift + 1);
   if (getArgCount() > 0)
     Args->print(Os, Shift + 1);
+}
+
+void BuiltinTypeExpr::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "BuiltinTypeExpr '";
+  getType()->print(Os);
+  Os << "'\n";
 }

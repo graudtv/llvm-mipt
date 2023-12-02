@@ -25,14 +25,19 @@ static std::unique_ptr<ASTNode> ParserResult;
 
 %token<int> inum "integer";
 %token<const char *> identifier "identifier";
+
+%token void bool int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64;
+
 %token ',' "comma";
-%nterm<mercy::ASTNode *>
+%nterm<mercy::Expression *>
   additive-expression
   expression
   multiplicative-expression
   prefix-expression
   postfix-expression
-  primary-expression;
+  primary-expression
+  type-expression
+  builtin-type;
 
 %nterm<mercy::ExpressionList *> expression-list
 
@@ -73,6 +78,23 @@ primary-expression
     : identifier { $$ = new Identifier($1); }
     | inum { $$ = new IntegralLiteral($1); }
     | '(' expression ')' { $$ = $2; }
+    | type-expression
+
+type-expression: builtin-type
+
+builtin-type
+    : void { $$ = new BuiltinTypeExpr(BuiltinType::getVoidTy()); }
+    | bool { $$ = new BuiltinTypeExpr(BuiltinType::getBoolTy()); }
+    | int   { $$ = new BuiltinTypeExpr(BuiltinType::getIntTy()); }
+    | int8  { $$ = new BuiltinTypeExpr(BuiltinType::getInt8Ty()); }
+    | int16 { $$ = new BuiltinTypeExpr(BuiltinType::getInt16Ty()); }
+    | int32 { $$ = new BuiltinTypeExpr(BuiltinType::getInt32Ty()); }
+    | int64 { $$ = new BuiltinTypeExpr(BuiltinType::getInt64Ty()); }
+    | uint   { $$ = new BuiltinTypeExpr(BuiltinType::getUintTy()); }
+    | uint8  { $$ = new BuiltinTypeExpr(BuiltinType::getUint8Ty()); }
+    | uint16 { $$ = new BuiltinTypeExpr(BuiltinType::getUint16Ty()); }
+    | uint32 { $$ = new BuiltinTypeExpr(BuiltinType::getUint32Ty()); }
+    | uint64 { $$ = new BuiltinTypeExpr(BuiltinType::getUint64Ty()); }
 
 %%
 

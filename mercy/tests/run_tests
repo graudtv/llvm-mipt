@@ -15,7 +15,9 @@ sub test_case {
   ++$err_count unless $ok;
 }
 
-my $path = dirname($0) . "/tests";
-do $path or die "failed to run tests";
+my @tests = glob(dirname($0) . "/test_*");
+for my $test (@tests) {
+  do $test or die "failed to run tests";
+}
 
 exit($err_count ? 1 : 0);

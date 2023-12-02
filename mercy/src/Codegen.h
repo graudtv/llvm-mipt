@@ -14,6 +14,8 @@ class Codegen {
   llvm::FunctionCallee getOrInsertPrintFunc(llvm::Type *ValueTy,
                                             const char *Postfix,
                                             const char *Fmt);
+  llvm::FunctionCallee getOrInsertPrintFunc(BuiltinType *Ty);
+
 public:
   Codegen();
   llvm::Value *emitIntegralLiteral(IntegralLiteral *IL);

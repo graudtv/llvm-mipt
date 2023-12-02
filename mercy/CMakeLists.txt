@@ -29,6 +29,7 @@ add_executable(mercy
   src/mercy.cpp
   src/AST.cpp
   src/Codegen.cpp
+  src/Type.cpp
   ${FLEX_lexer_OUTPUTS}
   ${BISON_parser_OUTPUTS}
 )
@@ -40,3 +41,4 @@ add_custom_target(test ALL
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS mercy
 )
+set_target_properties(test PROPERTIES EXCLUDE_FROM_ALL 1)
