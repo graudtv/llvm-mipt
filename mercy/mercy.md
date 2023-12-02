@@ -197,9 +197,9 @@ additive-expression
     | additive-expression "-" multiplicative-expression
     | multiplicative-expression
 multiplicative-expression
-    : multiplicative-expression "*" primary-expression
-    | multiplicative-expression "/" primary-expression
-    | multiplicative-expression "%" primary-expression
+    : multiplicative-expression "*" prefix-expression
+    | multiplicative-expression "/" prefix-expression
+    | multiplicative-expression "%" prefix-expression
     | prefix-expression
 prefix-expression
     : "!" postfix-expression
@@ -503,9 +503,9 @@ additive-expression
     | additive-expression "-" multiplicative-expression
     | multiplicative-expression
 multiplicative-expression
-    : multiplicative-expression "*" primary-expression
-    | multiplicative-expression "/" primary-expression
-    | multiplicative-expression "%" primary-expression
+    : multiplicative-expression "*" prefix-expression
+    | multiplicative-expression "/" prefix-expression
+    | multiplicative-expression "%" prefix-expression
     | prefix-expression
 prefix-expression
     : "!" postfix-expression
