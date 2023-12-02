@@ -34,3 +34,9 @@ add_executable(mercy
 )
 target_compile_definitions(mercy PRIVATE ${LLVM_DEFINITIONS_LIST})
 target_link_libraries(mercy LLVMCore)
+
+add_custom_target(test ALL
+  COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_tests
+  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+  DEPENDS mercy
+)

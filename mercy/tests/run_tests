@@ -1,0 +1,21 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use File::Basename;
+
+my $err_count = 0;
+
+sub test_case {
+  my %args = @_;
+  my $output = qx`echo '$args{source}' | ./mercy -S --emit-llvm | lli`;
+  chomp $output;
+  my $ok = ($output eq $args{expect});
+  printf "%-30s %s\n", $args{name}, ($ok ? "OK" : "FAIL");
+  ++$err_count unless $ok;
+}
+
+my $path = dirname($0) . "/tests";
+do $path or die "failed to run tests";
+
+exit($err_count ? 1 : 0);
