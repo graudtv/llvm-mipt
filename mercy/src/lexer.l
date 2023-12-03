@@ -2,7 +2,7 @@
 %option yylineno
 
 %{
-namespace mercy { class ASTNode; class ExpressionList; class Expression; }
+namespace mercy { class ASTNode; class NodeList; class Expression; }
 
 #include "parser.tab.h"
 %}

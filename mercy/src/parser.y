@@ -30,6 +30,7 @@ static std::unique_ptr<ASTNode> ParserResult;
 
 %token ',' "comma";
 %nterm<mercy::Expression *>
+  statement
   additive-expression
   expression
   multiplicative-expression
@@ -39,13 +40,24 @@ static std::unique_ptr<ASTNode> ParserResult;
   type-expression
   builtin-type;
 
-%nterm<mercy::ExpressionList *> expression-list
+%nterm<mercy::NodeList *> statement-list expression-list
 
 %start program
 
 %%
 
-program: expression { ParserResult = std::unique_ptr<ASTNode>($1); }
+program: translation-unit
+
+translation-unit
+    : statement-list { ParserResult = std::unique_ptr<ASTNode>($1); }
+    | %empty { ParserResult = std::make_unique<NodeList>(); }
+
+statement-list
+    : statement-list statement { $1->append($2); $$ = $1; }
+    | statement { $$ = new NodeList($1); }
+
+statement
+    : expression ';'
 
 expression
     : additive-expression
@@ -72,7 +84,7 @@ postfix-expression
 
 expression-list
     : expression-list ',' expression { $1->append($3); $$ = $1; }
-    | expression { $$ = new ExpressionList($1); }
+    | expression { $$ = new NodeList($1); }
 
 primary-expression
     : identifier { $$ = new Identifier($1); }

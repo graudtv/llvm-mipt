@@ -68,10 +68,10 @@ void Identifier::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "Identifier '" << Name << "'\n";
 }
 
-void ExpressionList::print(llvm::raw_ostream &Os, unsigned Shift) const {
-  Os << tabulate(Shift) << "ExpressionList\n";
-  llvm::for_each(Exprs,
-                 [&Os, Shift](auto &&Expr) { Expr->print(Os, Shift + 1); });
+void NodeList::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "NodeList\n";
+  llvm::for_each(Nodes,
+                 [&Os, Shift](auto &&N) { N->print(Os, Shift + 1); });
 }
 
 void FunctionCall::print(llvm::raw_ostream &Os, unsigned Shift) const {

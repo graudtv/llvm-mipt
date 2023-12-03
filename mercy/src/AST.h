@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Type.h"
+#include <llvm/ADT/STLExtras.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/raw_ostream.h>
 #include <memory>
@@ -28,7 +29,7 @@ public:
     NK_UnaryOperator,
     NK_Identifier,
     NK_FunctionCall,
-    NK_ExpressionList,
+    NK_NodeList,
     NK_BuiltinTypeExpr
   };
 
@@ -152,40 +153,48 @@ public:
   }
 };
 
-class ExpressionList : public ASTNode {
-  std::vector<std::unique_ptr<Expression>> Exprs;
+class NodeList : public ASTNode {
+  std::vector<std::unique_ptr<ASTNode>> Nodes;
 
 public:
-  ExpressionList() : ASTNode(NK_ExpressionList) {}
-  ExpressionList(Expression *N) : ASTNode(NK_ExpressionList) { append(N); }
+  NodeList() : ASTNode(NK_NodeList) {}
+  NodeList(ASTNode *N) : NodeList() { append(N); }
 
-  void append(Expression *N) { Exprs.emplace_back(N); }
+  void append(ASTNode *N) { Nodes.emplace_back(N); }
 
-  size_t size() const { return Exprs.size(); }
-  Expression *getExpr(size_t Idx) { return Exprs[Idx].get(); }
+  size_t size() const { return Nodes.size(); }
+  ASTNode *getNode(size_t Idx) { return Nodes[Idx].get(); }
+
+  template <class NodeT> auto getNodesAs() {
+    return llvm::map_range(Nodes, [](auto &&N) { return llvm::cast<NodeT>(N.get()); });
+  }
+  auto getNodes() { return getNodesAs<ASTNode>(); }
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
 
   static bool classof(const ASTNode *N) {
-    return N->getNodeKind() == NK_ExpressionList;
+    return N->getNodeKind() == NK_NodeList;
   }
 };
 
 class FunctionCall : public Expression {
   std::unique_ptr<ASTNode> Callee;
-  std::unique_ptr<ExpressionList> Args;
+  std::unique_ptr<NodeList> Args;
 
 public:
-  FunctionCall(ASTNode *C, ExpressionList *ExprList)
-      : Expression(NK_FunctionCall), Callee(C), Args(ExprList) {}
-  FunctionCall(ASTNode *C) : FunctionCall(C, new ExpressionList) {}
+  FunctionCall(ASTNode *C, NodeList *ArgList)
+      : Expression(NK_FunctionCall), Callee(C), Args(ArgList) {}
+  FunctionCall(ASTNode *C) : FunctionCall(C, new NodeList) {}
 
   ASTNode *getCallee() { return Callee.get(); }
 
-  ExpressionList *getArgList() { return Args.get(); }
-  const ExpressionList *getArgList() const { return Args.get(); }
-  Expression *getArg(size_t Idx) { return Args->getExpr(Idx); }
+  NodeList *getArgList() { return Args.get(); }
+  const NodeList *getArgList() const { return Args.get(); }
+  Expression *getArg(size_t Idx) {
+    return llvm::cast<Expression>(Args->getNode(Idx));
+  }
+  auto getArgs() { return Args->getNodesAs<Expression>(); }
   size_t getArgCount() const { return Args->size(); }
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;

@@ -24,7 +24,7 @@ VISIT_NODE(FunctionCall)
 
 SKIP_NODE(BuiltinTypeExpr)
 
-UNREACHABLE_NODE(ExpressionList)
+UNREACHABLE_NODE(NodeList)
 UNREACHABLE_NODE(Identifier)
 
 namespace {
@@ -138,8 +138,8 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
 
   /* Generate each function argument */
   std::vector<llvm::Value *> Arguments;
-  for (size_t I = 0; I < FC->getArgCount(); ++I)
-    Arguments.push_back(FC->getArg(I)->codegen(*this));
+  for (Expression *Arg : FC->getArgs())
+    Arguments.push_back(Arg->codegen(*this));
 
   /* Handle type conversions */
   if (auto *BTE = llvm::dyn_cast<BuiltinTypeExpr>(Callee)) {
@@ -195,6 +195,7 @@ void Codegen::run(std::unique_ptr<ASTNode> AST) {
       MainFuncTy, llvm::Function::ExternalLinkage, "main", *M);
   llvm::BasicBlock *EntryBB = llvm::BasicBlock::Create(Ctx, "entry", MainFunc);
   Builder.SetInsertPoint(EntryBB);
-  auto Last = AST->codegen(*this);
+  for (ASTNode *N : llvm::cast<NodeList>(AST.get())->getNodes())
+    N->codegen(*this);
   Builder.CreateRet(Builder.getInt32(0));
 }

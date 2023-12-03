@@ -1,69 +1,74 @@
 test_case(name => "print",
-  source => "print(10)",
+  source => "print(10);",
   expect => "10"
 );
 
 test_case(name => "add",
-  source => "print(10 + 10 + 10)",
+  source => "print(10 + 10 + 10);",
   expect => "30"
 );
 
 test_case(name => "sub",
-  source => "print(200 - 10 - 10)",
+  source => "print(200 - 10 - 10);",
   expect => "180"
 );
 
 test_case(name => "umul",
-  source => "print(10 * 10 * 10)",
+  source => "print(10 * 10 * 10);",
   expect => "1000"
 );
 
 test_case(name => "smul",
-  source => "print(10 * 10 * -10)",
+  source => "print(10 * 10 * -10);",
   expect => "-1000"
 );
 
 test_case(name => "udiv",
-  source => "print(128 / 2 / 4)",
+  source => "print(128 / 2 / 4);",
   expect => "16"
 );
 
 test_case(name => "sdiv",
-  source => "print(128 / 2 / -4)",
+  source => "print(128 / 2 / -4);",
   expect => "-16"
 );
 
 test_case(name => "arithm_expr",
-  source => "print(2 + 2 * 2)",
+  source => "print(2 + 2 * 2);",
   expect => "6"
 );
 
 test_case(name => "cast_uint8",
-  source => "print(uint8(0xdeadbeaf))",
+  source => "print(uint8(0xdeadbeaf));",
   expect => 0xaf
 );
 
 test_case(name => "cast_uint16",
-  source => "print(uint16(0xdeadbeaf))",
+  source => "print(uint16(0xdeadbeaf));",
   expect => 0xbeaf
 );
 
 test_case(name => "cast_uint_twice",
-  source => "print(uint32(uint64(0xdeadbeaf)))",
+  source => "print(uint32(uint64(0xdeadbeaf)));",
   expect => 0xdeadbeaf
 );
 
 test_case(name => "cast_int8",
-  source => "print(int8(0xffffffff))",
+  source => "print(int8(0xffffffff));",
   expect => "-1"
 );
 
 test_case(name => "cast_int16",
-  source => "print(int16(0xffffffff))",
+  source => "print(int16(0xffffffff));",
   expect => "-1"
 );
 
 test_case(name => "cast_int_twice",
-  source => "print(int32(int64(0xffffffff)))",
+  source => "print(int32(int64(0xffffffff)));",
   expect => "-1"
+);
+
+test_case(name => "multiline",
+  source => "print(1); print(2); print(3);",
+  expect => "1\n2\n3"
 );
