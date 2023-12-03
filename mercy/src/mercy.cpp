@@ -1,5 +1,6 @@
 #include "Parser.h"
 #include "Codegen.h"
+#include "Sema.h"
 #include <llvm/Support/CommandLine.h>
 #include <llvm/IR/Verifier.h>
 
@@ -58,6 +59,8 @@ int main(int argc, char *argv[]) {
     AST->print(OS);
     return 0;
   }
+  Sema S;
+  S.run(AST.get());
 
   Codegen Gen;
   Gen.run(std::move(AST));

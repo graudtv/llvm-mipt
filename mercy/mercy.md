@@ -328,8 +328,8 @@ statement-list
     | statement
 statement
     : declaration
-    | expression
-    | "return" expression
+    | expression ";"
+    | "return" expression ";"
 ```
 
 ##### Extern expression
@@ -548,8 +548,8 @@ statement-list
     | statement
 statement
     : declaration
-    | expression
-    | "return" expression
+    | expression ";"
+    | "return" expression ";"
 
 extern-expression
     : "extern" "(" identifier "," expression ")"

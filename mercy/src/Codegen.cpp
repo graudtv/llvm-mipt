@@ -21,11 +21,12 @@ VISIT_NODE(IntegralLiteral)
 VISIT_NODE(BinaryOperator)
 VISIT_NODE(UnaryOperator)
 VISIT_NODE(FunctionCall)
+VISIT_NODE(Declaration)
+VISIT_NODE(Identifier)
 
 SKIP_NODE(BuiltinTypeExpr)
 
 UNREACHABLE_NODE(NodeList)
-UNREACHABLE_NODE(Identifier)
 
 namespace {
 
@@ -86,50 +87,30 @@ llvm::Value *Codegen::emitIntegralLiteral(IntegralLiteral *IL) {
 }
 
 llvm::Value *Codegen::emitBinaryOperator(BinaryOperator *BinOp) {
-  llvm::Value *LHSVal = BinOp->getLHS()->codegen(*this);
-  llvm::Value *RHSVal = BinOp->getRHS()->codegen(*this);
+  llvm::Value *LHS = BinOp->getLHS()->codegen(*this);
+  llvm::Value *RHS = BinOp->getRHS()->codegen(*this);
 
-  /* A little bit of semantic analys */
-  Expression *LHS = llvm::cast<Expression>(BinOp->getLHS());
-  Expression *RHS = llvm::cast<Expression>(BinOp->getRHS());
-  if (!LHS->getType()->isBuiltinType())
-    emitError(LHS, "invalid operand in binary operator");
-  if (!RHS->getType()->isBuiltinType())
-    emitError(RHS, "invalid operand in binary operator");
-  if (LHS->getType() != RHS->getType())
-    emitError(LHS, "operands of binary operator have different types");
-  BuiltinType *OperandType = llvm::cast<BuiltinType>(LHS->getType());
+  BuiltinType *OpTy = llvm::cast<BuiltinType>(BinOp->getType());
   BinaryOperator::BinOpKind BK = BinOp->getKind();
-  if (!OperandType->isInteger())
-    emitError(BinOp, "invalid operand in binary operator, must be integer");
-  BinOp->setType(OperandType);
-
-  /* Codegen */
   if (BK == BinaryOperator::ADD)
-    return Builder.CreateAdd(LHSVal, RHSVal);
+    return Builder.CreateAdd(LHS, RHS);
   if (BK == BinaryOperator::SUB)
-    return Builder.CreateSub(LHSVal, RHSVal);
+    return Builder.CreateSub(LHS, RHS);
   if (BK == BinaryOperator::MUL)
-    return Builder.CreateMul(LHSVal, RHSVal);
+    return Builder.CreateMul(LHS, RHS);
   if (BK == BinaryOperator::DIV)
-    return (OperandType->isSigned()) ? Builder.CreateSDiv(LHSVal, RHSVal)
-                                     : Builder.CreateUDiv(LHSVal, RHSVal);
+    return (OpTy->isSigned()) ? Builder.CreateSDiv(LHS, RHS)
+                              : Builder.CreateUDiv(LHS, RHS);
   if (BK == BinaryOperator::REM)
-    return (OperandType->isSigned()) ? Builder.CreateSRem(LHSVal, RHSVal)
-                                     : Builder.CreateURem(LHSVal, RHSVal);
+    return (OpTy->isSigned()) ? Builder.CreateSRem(LHS, RHS)
+                              : Builder.CreateURem(LHS, RHS);
   llvm_unreachable("unhandled binary operator kind");
 }
 
 llvm::Value *Codegen::emitUnaryOperator(UnaryOperator *Op) {
-  llvm::Value *ExprVal = Op->getExpr()->codegen(*this);
-  Expression *Expr = llvm::cast<Expression>(Op->getExpr());
-
-  if (Op->getKind() == UnaryOperator::NEG) {
-    if (Expr->getType() != BuiltinType::getBoolTy())
-      emitError(Op, "invalid operand in negation, must be boolean");
-    Op->setType(Expr->getType());
-    return Builder.CreateNeg(ExprVal);
-  }
+  llvm::Value *Expr = Op->getExpr()->codegen(*this);
+  if (Op->getKind() == UnaryOperator::NEG)
+    return Builder.CreateNeg(Expr);
   llvm_unreachable("unhandled unary operator kind");
 }
 
@@ -145,15 +126,6 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
   if (auto *BTE = llvm::dyn_cast<BuiltinTypeExpr>(Callee)) {
     /* Conversion to builtin type */
     if (auto *CastTy = llvm::dyn_cast<BuiltinType>(BTE->getReferencedType())) {
-      if (FC->getArgCount() != 1)
-        emitError(Callee, "invalid number of arguments in type cast");
-      auto *ArgTy = FC->getArg(0)->getType();
-      if (!ArgTy->isBuiltinType() ||
-          !llvm::cast<BuiltinType>(ArgTy)->isInteger() || !CastTy->isInteger())
-        emitError(Callee, "cast from '" + ArgTy->toString() + "' to '" +
-                              CastTy->toString() + "' is not allowed");
-
-      FC->setType(CastTy);
       return Builder.CreateIntCast(Arguments.front(), CastTy->getLLVMType(Ctx),
                                    CastTy->isSigned());
     }
@@ -186,6 +158,27 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
   assert(0 && "not implemented");
 }
 
+llvm::Value *Codegen::emitDeclaration(Declaration *Decl) {
+  assert(!Decl->isRef() && "references not implemented");
+  assert(llvm::isa<BuiltinType>(Decl->getInitializer()->getType()) &&
+         "only builtin type decls are implemented");
+
+  BuiltinType *ExprTy =
+      llvm::cast<BuiltinType>(Decl->getInitializer()->getType());
+  Decl->setAlloca(Builder.CreateAlloca(ExprTy->getLLVMType(Ctx)));
+  llvm::Value *Initializer = Decl->getInitializer()->codegen(*this);
+  Builder.CreateStore(Initializer, Decl->getAlloca());
+  return nullptr;
+}
+
+llvm::Value *Codegen::emitIdentifier(Identifier *Id) {
+  assert(llvm::isa<BuiltinType>(Id->getType()) &&
+         "only builtin types are implemented");
+  BuiltinType *IdTy = llvm::cast<BuiltinType>(Id->getType());
+  return Builder.CreateLoad(IdTy->getLLVMType(Ctx),
+                            Id->getDeclaration()->getAlloca());
+}
+
 void Codegen::run(std::unique_ptr<ASTNode> AST) {
   M = std::make_unique<llvm::Module>("top", Ctx);
 
@@ -195,7 +188,8 @@ void Codegen::run(std::unique_ptr<ASTNode> AST) {
       MainFuncTy, llvm::Function::ExternalLinkage, "main", *M);
   llvm::BasicBlock *EntryBB = llvm::BasicBlock::Create(Ctx, "entry", MainFunc);
   Builder.SetInsertPoint(EntryBB);
-  for (ASTNode *N : llvm::cast<NodeList>(AST.get())->getNodes())
-    N->codegen(*this);
+  auto Statements = llvm::cast<NodeList>(AST.get())->getNodes();
+  for (auto S : Statements)
+    S->codegen(*this);
   Builder.CreateRet(Builder.getInt32(0));
 }

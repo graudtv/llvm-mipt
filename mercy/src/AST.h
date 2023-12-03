@@ -14,6 +14,8 @@ class Value;
 namespace mercy {
 
 class Codegen;
+class Sema;
+class Declaration;
 
 struct Location {
   unsigned LineNo = 0;
@@ -29,6 +31,7 @@ public:
     NK_UnaryOperator,
     NK_Identifier,
     NK_FunctionCall,
+    NK_Declaration,
     NK_NodeList,
     NK_BuiltinTypeExpr
   };
@@ -44,6 +47,7 @@ public:
   NodeKind getNodeKind() const { return NK; }
   virtual void print(llvm::raw_ostream &Os, unsigned Shift) const = 0;
   virtual llvm::Value *codegen(Codegen &Gen) = 0;
+  virtual void sema(Sema &S) = 0;
 
   void setLocation(Location L) { Loc = L; }
   Location getLocation() const { return Loc; }
@@ -82,6 +86,7 @@ public:
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_IntegralLiteral;
@@ -109,6 +114,7 @@ public:
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_BinaryOperator;
@@ -121,35 +127,72 @@ public:
 
 private:
   UnaryOpKind Kind;
-  std::unique_ptr<ASTNode> Expr;
+  std::unique_ptr<Expression> Expr;
 
 public:
-  UnaryOperator(UnaryOpKind K, ASTNode *N)
-      : Expression(NK_UnaryOperator), Kind(K), Expr(N) {}
+  UnaryOperator(UnaryOpKind K, Expression *E)
+      : Expression(NK_UnaryOperator), Kind(K), Expr(E) {}
 
-  ASTNode *getExpr() { return Expr.get(); }
+  Expression *getExpr() { return Expr.get(); }
   UnaryOpKind getKind() const { return Kind; }
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_UnaryOperator;
   }
 };
 
+/* Identifier referencing to some object */
 class Identifier : public Expression {
   std::string Name;
+  Declaration *Decl = nullptr;
 
 public:
   Identifier(std::string Id) : Expression(NK_Identifier), Name(std::move(Id)) {}
   const std::string &getName() const { return Name; }
 
+  /* Set during Sema */
+  void setDeclaration(Declaration *D) { Decl = D; }
+  Declaration *getDeclaration() { return Decl; }
+
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_Identifier;
+  }
+};
+
+/* Variable or type alias declaration */
+class Declaration : public ASTNode {
+  std::string Identifier;
+  std::unique_ptr<Expression> Initializer;
+  bool IsRef;
+  llvm::Value *Alloca = nullptr;
+
+public:
+  Declaration(std::string Id, Expression *E, bool IsReference)
+      : ASTNode(NK_Declaration), Identifier(std::move(Id)), Initializer(E),
+        IsRef(IsReference) {}
+
+  const std::string &getId() { return Identifier; }
+  Expression *getInitializer() const { return Initializer.get(); }
+  bool isRef() const { return IsRef; }
+
+  /* Set by Codegen */
+  void setAlloca(llvm::Value *A) { Alloca = A; }
+  llvm::Value *getAlloca() { return Alloca; }
+
+  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
+
+  static bool classof(const ASTNode *N) {
+    return N->getNodeKind() == NK_Declaration;
   }
 };
 
@@ -166,12 +209,14 @@ public:
   ASTNode *getNode(size_t Idx) { return Nodes[Idx].get(); }
 
   template <class NodeT> auto getNodesAs() {
-    return llvm::map_range(Nodes, [](auto &&N) { return llvm::cast<NodeT>(N.get()); });
+    return llvm::map_range(Nodes,
+                           [](auto &&N) { return llvm::cast<NodeT>(N.get()); });
   }
   auto getNodes() { return getNodesAs<ASTNode>(); }
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_NodeList;
@@ -199,6 +244,7 @@ public:
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_FunctionCall;
@@ -219,6 +265,7 @@ public:
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_BuiltinTypeExpr;

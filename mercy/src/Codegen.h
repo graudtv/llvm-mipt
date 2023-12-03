@@ -22,6 +22,8 @@ public:
   llvm::Value *emitBinaryOperator(BinaryOperator *BinOp);
   llvm::Value *emitUnaryOperator(UnaryOperator *Op);
   llvm::Value *emitFunctionCall(FunctionCall *FC);
+  llvm::Value *emitDeclaration(Declaration *Decl);
+  llvm::Value *emitIdentifier(Identifier *Id);
 
   void run(std::unique_ptr<ASTNode> AST);
 

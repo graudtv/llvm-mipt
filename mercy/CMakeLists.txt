@@ -26,10 +26,11 @@ include_directories(
 
 # qrisc-asm
 add_executable(mercy
-  src/mercy.cpp
   src/AST.cpp
   src/Codegen.cpp
+  src/Sema.cpp
   src/Type.cpp
+  src/mercy.cpp
   ${FLEX_lexer_OUTPUTS}
   ${BISON_parser_OUTPUTS}
 )

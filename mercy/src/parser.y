@@ -24,13 +24,17 @@ static std::unique_ptr<ASTNode> ParserResult;
 %define api.value.type union
 
 %token<int> inum "integer";
-%token<const char *> identifier "identifier";
+%token<char *> identifier "identifier";
 
 %token void bool int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64;
+%token let return
 
 %token ',' "comma";
-%nterm<mercy::Expression *>
+%nterm<mercy::ASTNode *>
+  declaration
   statement
+
+%nterm<mercy::Expression *>
   additive-expression
   expression
   multiplicative-expression
@@ -52,12 +56,18 @@ translation-unit
     : statement-list { ParserResult = std::unique_ptr<ASTNode>($1); }
     | %empty { ParserResult = std::make_unique<NodeList>(); }
 
+declaration
+    : let identifier '=' expression ';' { $$ = new Declaration($2, $4, /*IsRef=*/ false); free($2); }
+    | let '&' identifier '=' expression ';' { $$ = new Declaration($3, $5, /*IsRef=*/ true); free($3); }
+
 statement-list
     : statement-list statement { $1->append($2); $$ = $1; }
     | statement { $$ = new NodeList($1); }
 
 statement
-    : expression ';'
+    : declaration { $$ = $1; }
+    | expression ';' { $$ = $1; }
+    //| return expression ';'
 
 expression
     : additive-expression
@@ -87,7 +97,7 @@ expression-list
     | expression { $$ = new NodeList($1); }
 
 primary-expression
-    : identifier { $$ = new Identifier($1); }
+    : identifier { $$ = new Identifier($1); free($1); }
     | inum { $$ = new IntegralLiteral($1); }
     | '(' expression ')' { $$ = $2; }
     | type-expression

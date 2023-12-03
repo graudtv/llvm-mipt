@@ -72,3 +72,9 @@ test_case(name => "multiline",
   source => "print(1); print(2); print(3);",
   expect => "1\n2\n3"
 );
+
+test_case(name => "identifiers",
+  source => "let x=5; let y = 7; print(x * y - x + y);",
+  expect => "37"
+);
+
