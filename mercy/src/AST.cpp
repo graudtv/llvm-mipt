@@ -47,15 +47,22 @@ void IntegralLiteral::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "IntegralLiteral " << Value << '\n';
 }
 
-void BinaryOperator::print(llvm::raw_ostream &Os, unsigned Shift) const {
-  Os << tabulate(Shift) << "BinaryOperator '" << getMnemonic()
-     << "'\n";
-  LHS->print(Os, Shift + 1);
-  RHS->print(Os, Shift + 1);
+IntegralLiteral *IntegralLiteral::clone() const {
+  return new IntegralLiteral(Value);
 }
 
 const char *BinaryOperator::getMnemonic() const {
   return getBinaryOpKindStr(Kind);
+}
+
+void BinaryOperator::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "BinaryOperator '" << getMnemonic() << "'\n";
+  LHS->print(Os, Shift + 1);
+  RHS->print(Os, Shift + 1);
+}
+
+BinaryOperator *BinaryOperator::clone() const {
+  return new BinaryOperator(Kind, LHS->clone(), RHS->clone());
 }
 
 void UnaryOperator::print(llvm::raw_ostream &Os, unsigned Shift) const {
@@ -64,9 +71,15 @@ void UnaryOperator::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Expr->print(Os, Shift + 1);
 }
 
+UnaryOperator *UnaryOperator::clone() const {
+  return new UnaryOperator(Kind, Expr->clone());
+}
+
 void Identifier::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "Identifier '" << Name << "'\n";
 }
+
+Identifier *Identifier::clone() const { return new Identifier(Name); }
 
 void Declaration::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "Declaration " << ((IsRef) ? "& " : "") << "'"
@@ -75,16 +88,30 @@ void Declaration::print(llvm::raw_ostream &Os, unsigned Shift) const {
     Initializer->print(Os, Shift + 1);
 }
 
+Declaration *Declaration::clone() const {
+  return new Declaration(Identifier, Initializer->clone(), IsRef);
+}
+
 void NodeList::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "NodeList\n";
-  llvm::for_each(Nodes,
-                 [&Os, Shift](auto &&N) { N->print(Os, Shift + 1); });
+  llvm::for_each(Nodes, [&Os, Shift](auto &&N) { N->print(Os, Shift + 1); });
+}
+
+NodeList *NodeList::clone() const {
+  NodeList *List = new NodeList;
+  for (auto &&N : Nodes)
+    List->append(N->clone());
+  return List;
 }
 
 void FunctionDeclaration::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "FunctionDeclaration '" << Identifier << "'\n";
   Params->print(Os, Shift + 1);
   Body->print(Os, Shift + 1);
+}
+
+FunctionDeclaration *FunctionDeclaration::clone() const {
+  return new FunctionDeclaration(Identifier, Params->clone(), Body->clone());
 }
 
 void FunctionCall::print(llvm::raw_ostream &Os, unsigned Shift) const {
@@ -96,8 +123,16 @@ void FunctionCall::print(llvm::raw_ostream &Os, unsigned Shift) const {
     Args->print(Os, Shift + 1);
 }
 
+FunctionCall *FunctionCall::clone() const {
+  return new FunctionCall(Callee->clone(), Args->clone());
+}
+
 void BuiltinTypeExpr::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "BuiltinTypeExpr '";
   getType()->print(Os);
   Os << "'\n";
+}
+
+BuiltinTypeExpr *BuiltinTypeExpr::clone() const {
+  return new BuiltinTypeExpr(getReferencedType());
 }

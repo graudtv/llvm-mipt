@@ -19,13 +19,13 @@ VISIT_NODE(BinaryOperator)
 VISIT_NODE(UnaryOperator)
 VISIT_NODE(FunctionCall)
 VISIT_NODE(Declaration)
+VISIT_NODE(FunctionDeclaration)
 VISIT_NODE(Identifier)
 
 SKIP_NODE(IntegralLiteral)
 
 UNREACHABLE_NODE(BuiltinTypeExpr)
 UNREACHABLE_NODE(NodeList)
-UNREACHABLE_NODE(FunctionDeclaration)
 
 void emitError(ASTNode *Node, const llvm::Twine &T) {
   llvm::errs() << "line " << Node->getLocation().LineNo << ": " << T << '\n';
@@ -96,6 +96,10 @@ void Sema::actOnDeclaration(Declaration *Decl) {
     emitError(Decl, "redefinition of '" + Decl->getId() + "'");
   Decls[Decl->getId()] = Decl;
   Decl->getInitializer()->sema(*this);
+}
+
+void Sema::actOnFunctionDeclaration(FunctionDeclaration *FD) {
+
 }
 
 /* Lookup declaration and set type of identifier */

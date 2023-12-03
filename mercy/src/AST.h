@@ -49,6 +49,7 @@ public:
   virtual void print(llvm::raw_ostream &Os, unsigned Shift) const = 0;
   virtual llvm::Value *codegen(Codegen &Gen) = 0;
   virtual void sema(Sema &S) = 0;
+  virtual ASTNode *clone() const = 0;
 
   void setLocation(Location L) { Loc = L; }
   Location getLocation() const { return Loc; }
@@ -62,9 +63,9 @@ class Expression : public ASTNode {
   Type *Ty;
 
 public:
-  Type *getType() { return Ty; }
-  const Type *getType() const { return Ty; }
+  Type *getType() const { return Ty; }
   void setType(Type *T) { Ty = T; }
+  virtual Expression *clone() const = 0;
 
   Expression(NodeKind NK, Type *T = nullptr) : ASTNode(NK), Ty(T) {}
 
@@ -88,6 +89,7 @@ public:
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
+  IntegralLiteral *clone() const override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_IntegralLiteral;
@@ -116,6 +118,7 @@ public:
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
+  BinaryOperator *clone() const override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_BinaryOperator;
@@ -140,6 +143,7 @@ public:
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
+  UnaryOperator *clone() const override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_UnaryOperator;
@@ -162,6 +166,7 @@ public:
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
+  Identifier *clone() const override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_Identifier;
@@ -193,6 +198,7 @@ public:
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
+  Declaration *clone() const override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_Declaration;
@@ -224,6 +230,7 @@ public:
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
+  NodeList *clone() const override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_NodeList;
@@ -251,6 +258,7 @@ public:
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
+  FunctionDeclaration *clone() const override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_FunctionDeclaration;
@@ -278,6 +286,7 @@ public:
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
+  FunctionCall *clone() const override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_FunctionCall;
@@ -289,16 +298,15 @@ public:
   BuiltinTypeExpr(BuiltinType *Ty)
       : Expression(NK_BuiltinTypeExpr, MetaType::getTypeOf(Ty)) {}
 
-  Type *getReferencedType() {
-    return llvm::cast<MetaType>(getType())->getReferencedType();
-  }
-  const Type *getReferencedType() const {
-    return llvm::cast<MetaType>(getType())->getReferencedType();
+  BuiltinType *getReferencedType() const {
+    return llvm::cast<BuiltinType>(
+        llvm::cast<MetaType>(getType())->getReferencedType());
   }
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
+  BuiltinTypeExpr *clone() const override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_BuiltinTypeExpr;

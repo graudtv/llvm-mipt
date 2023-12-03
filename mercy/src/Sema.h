@@ -13,6 +13,7 @@ public:
   void actOnUnaryOperator(UnaryOperator *Op);
   void actOnFunctionCall(FunctionCall *FC);
   void actOnDeclaration(Declaration *Decl);
+  void actOnFunctionDeclaration(FunctionDeclaration *FD);
   void actOnIdentifier(Identifier *Id);
 
   void run(ASTNode *TU);
