@@ -33,6 +33,7 @@ static std::unique_ptr<ASTNode> ParserResult;
 %nterm<mercy::ASTNode *>
   declaration
   statement
+  function-parameter
 
 %nterm<mercy::Expression *>
   additive-expression
@@ -44,7 +45,11 @@ static std::unique_ptr<ASTNode> ParserResult;
   type-expression
   builtin-type;
 
-%nterm<mercy::NodeList *> statement-list expression-list
+%nterm<mercy::NodeList *>
+  statement-list
+  expression-list
+  optional-function-parameter-list
+  function-parameter-list
 
 %start program
 
@@ -55,19 +60,32 @@ program: translation-unit
 translation-unit
     : statement-list { ParserResult = std::unique_ptr<ASTNode>($1); }
     | %empty { ParserResult = std::make_unique<NodeList>(); }
-
-declaration
-    : let identifier '=' expression ';' { $$ = new Declaration($2, $4, /*IsRef=*/ false); free($2); }
-    | let '&' identifier '=' expression ';' { $$ = new Declaration($3, $5, /*IsRef=*/ true); free($3); }
-
 statement-list
     : statement-list statement { $1->append($2); $$ = $1; }
     | statement { $$ = new NodeList($1); }
-
 statement
     : declaration { $$ = $1; }
     | expression ';' { $$ = $1; }
     //| return expression ';'
+
+
+declaration
+    : let identifier '=' expression ';' { $$ = new Declaration($2, $4, /*IsRef=*/ false); free($2); }
+    | let '&' identifier '=' expression ';' { $$ = new Declaration($3, $5, /*IsRef=*/ true); free($3); }
+    | let identifier '(' optional-function-parameter-list ')' '=' expression ';' { $$ = new FunctionDeclaration($2, $4, $7); free($2); }
+
+optional-function-parameter-list
+    : function-parameter-list
+    | %empty { $$ = new NodeList; }
+
+function-parameter-list
+    : function-parameter-list ',' function-parameter { $1->append($3); $$ = $1; }
+    | function-parameter { $$ = new NodeList($1); }
+
+function-parameter
+    : identifier { $$ = new Declaration($1, /*IsRef=*/ false); free($1); }
+    | '&' identifier { $$ = new Declaration($2, /*IsRef=*/ true); free($2); }
+
 
 expression
     : additive-expression

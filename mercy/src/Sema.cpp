@@ -24,8 +24,8 @@ VISIT_NODE(Identifier)
 SKIP_NODE(IntegralLiteral)
 
 UNREACHABLE_NODE(BuiltinTypeExpr)
-
 UNREACHABLE_NODE(NodeList)
+UNREACHABLE_NODE(FunctionDeclaration)
 
 void emitError(ASTNode *Node, const llvm::Twine &T) {
   llvm::errs() << "line " << Node->getLocation().LineNo << ": " << T << '\n';

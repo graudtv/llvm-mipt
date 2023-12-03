@@ -71,7 +71,8 @@ void Identifier::print(llvm::raw_ostream &Os, unsigned Shift) const {
 void Declaration::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "Declaration " << ((IsRef) ? "& " : "") << "'"
      << Identifier << "'\n";
-  Initializer->print(Os, Shift + 1);
+  if (Initializer)
+    Initializer->print(Os, Shift + 1);
 }
 
 void NodeList::print(llvm::raw_ostream &Os, unsigned Shift) const {
@@ -79,6 +80,13 @@ void NodeList::print(llvm::raw_ostream &Os, unsigned Shift) const {
   llvm::for_each(Nodes,
                  [&Os, Shift](auto &&N) { N->print(Os, Shift + 1); });
 }
+
+void FunctionDeclaration::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "FunctionDeclaration '" << Identifier << "'\n";
+  Params->print(Os, Shift + 1);
+  Body->print(Os, Shift + 1);
+}
+
 void FunctionCall::print(llvm::raw_ostream &Os, unsigned Shift) const {
   if (auto *Id = llvm::dyn_cast<Identifier>(Callee.get()))
     Os << tabulate(Shift) << "FunctionCall '" << Id->getName() << "'\n";

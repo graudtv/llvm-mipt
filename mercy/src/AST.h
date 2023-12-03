@@ -32,6 +32,7 @@ public:
     NK_Identifier,
     NK_FunctionCall,
     NK_Declaration,
+    NK_FunctionDeclaration,
     NK_NodeList,
     NK_BuiltinTypeExpr
   };
@@ -167,7 +168,7 @@ public:
   }
 };
 
-/* Variable or type alias declaration */
+/* Variable, type alias or function parameter declaration */
 class Declaration : public ASTNode {
   std::string Identifier;
   std::unique_ptr<Expression> Initializer;
@@ -178,9 +179,11 @@ public:
   Declaration(std::string Id, Expression *E, bool IsReference)
       : ASTNode(NK_Declaration), Identifier(std::move(Id)), Initializer(E),
         IsRef(IsReference) {}
+  Declaration(std::string Id, bool IsReference)
+      : Declaration(std::move(Id), nullptr, IsReference) {}
 
-  const std::string &getId() { return Identifier; }
-  Expression *getInitializer() const { return Initializer.get(); }
+  const std::string &getId() const { return Identifier; }
+  Expression *getInitializer() { return Initializer.get(); }
   bool isRef() const { return IsRef; }
 
   /* Set by Codegen */
@@ -208,6 +211,10 @@ public:
   size_t size() const { return Nodes.size(); }
   ASTNode *getNode(size_t Idx) { return Nodes[Idx].get(); }
 
+  template <class NodeT> NodeT *getNodeAs(size_t Idx) {
+    return llvm::cast<NodeT>(Nodes[Idx].get());
+  }
+
   template <class NodeT> auto getNodesAs() {
     return llvm::map_range(Nodes,
                            [](auto &&N) { return llvm::cast<NodeT>(N.get()); });
@@ -220,6 +227,33 @@ public:
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_NodeList;
+  }
+};
+
+class FunctionDeclaration : public ASTNode {
+  std::string Identifier;
+  std::unique_ptr<NodeList> Params;
+  std::unique_ptr<Expression> Body;
+
+public:
+  FunctionDeclaration(std::string Id, NodeList *P, Expression *E)
+      : ASTNode(NK_FunctionDeclaration), Identifier(std::move(Id)), Params(P),
+        Body(E) {}
+
+  const std::string &getId() const { return Identifier; }
+  Expression *getBody() { return Body.get(); }
+
+  NodeList *getParamList() { return Params.get(); }
+  Declaration *getParam(size_t I) { return Params->getNodeAs<Declaration>(I); }
+  auto getParams() { return Params->getNodesAs<Declaration>(); }
+  size_t getParamCount() const { return Params->size(); }
+
+  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
+
+  static bool classof(const ASTNode *N) {
+    return N->getNodeKind() == NK_FunctionDeclaration;
   }
 };
 
@@ -236,9 +270,8 @@ public:
 
   NodeList *getArgList() { return Args.get(); }
   const NodeList *getArgList() const { return Args.get(); }
-  Expression *getArg(size_t Idx) {
-    return llvm::cast<Expression>(Args->getNode(Idx));
-  }
+
+  Expression *getArg(size_t I) { return Args->getNodeAs<Expression>(I); }
   auto getArgs() { return Args->getNodesAs<Expression>(); }
   size_t getArgCount() const { return Args->size(); }
 

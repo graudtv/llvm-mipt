@@ -27,6 +27,7 @@ VISIT_NODE(Identifier)
 SKIP_NODE(BuiltinTypeExpr)
 
 UNREACHABLE_NODE(NodeList)
+UNREACHABLE_NODE(FunctionDeclaration)
 
 namespace {
 
