@@ -179,8 +179,8 @@ and-expression
     : and-expression "&" equality-expression
     | equality-expression
 equality-expression
-    : equality-expresion "==" relational-expression
-    : equality-expresion "!=" relational-expression
+    : equality-expression "==" relational-expression
+    | equality-expression "!=" relational-expression
     | relational-expression
 relational-expression
     : relational-expression "<" shift-expression
@@ -485,8 +485,8 @@ and-expression
     : and-expression "&" equality-expression
     | equality-expression
 equality-expression
-    : equality-expresion "==" relational-expression
-    : equality-expresion "!=" relational-expression
+    : equality-expression "==" relational-expression
+    | equality-expression "!=" relational-expression
     | relational-expression
 relational-expression
     : relational-expression "<" shift-expression
