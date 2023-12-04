@@ -6,6 +6,8 @@
 
 namespace mercy {
 
+class Sema;
+
 class Codegen {
   llvm::LLVMContext Ctx;
   llvm::IRBuilder<> Builder;
@@ -16,7 +18,7 @@ class Codegen {
                                             const char *Fmt);
   llvm::FunctionCallee getOrInsertPrintFunc(BuiltinType *Ty);
 
-  llvm::FunctionCallee getOrInsertFuncDecl(FunctionDecl *FD);
+  llvm::FunctionCallee insertInstanceDecl(TemplateInstance *Instance);
 
 public:
   Codegen();
@@ -26,10 +28,11 @@ public:
   llvm::Value *emitFunctionCall(FunctionCall *FC);
   llvm::Value *emitVariableDecl(VariableDecl *Decl);
   llvm::Value *emitFuncParamDecl(FuncParamDecl *Decl);
-  llvm::Value *emitFunctionDecl(FunctionDecl *Decl);
   llvm::Value *emitIdentifier(Identifier *Id);
 
-  void run(ASTNode *AST);
+  void emitTemplateInstance(TemplateInstance *Instance);
+
+  void run(ASTNode *AST, Sema &S);
 
   /* Note that Module is binded to LLVMContext, i.e. Codegen must be alive
    * while returned module is used */

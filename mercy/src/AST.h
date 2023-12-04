@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Type.h"
+#include "misc.h"
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/raw_ostream.h>
@@ -9,13 +10,15 @@
 
 namespace llvm {
 class Value;
-}
+class Function;
+} // namespace llvm
 
 namespace mercy {
 
 class Codegen;
 class Sema;
 class Declaration;
+class CallableFunction;
 
 struct Location {
   unsigned LineNo = 0;
@@ -23,7 +26,7 @@ struct Location {
   bool isValid() const { return LineNo != 0; }
 };
 
-class ASTNode {
+class ASTNode : private NonCopyable {
 public:
   enum NodeKind {
     NK_IntegralLiteral,
@@ -35,7 +38,11 @@ public:
     NK_VariableDecl,
     NK_FuncParamDecl,
     NK_FunctionDecl,
-    NK_BuiltinTypeExpr
+    NK_BuiltinTypeExpr,
+
+    NK_CallableFunction,
+    NK_TemplateInstance,
+    NK_ExternFunction
   };
 
 private:
@@ -222,7 +229,6 @@ public:
       : ASTNode(NK), Id(std::move(Identifier)), Init(Initializer) {}
 
   const std::string &getId() const { return Id; }
-  void addIdPrefix(const std::string &Prefix) { Id = Prefix + Id; }
 
   Expression *getInitializer() { return Init.get(); }
   const Expression *getInitializer() const { return Init.get(); }
@@ -289,10 +295,13 @@ public:
 
 class FunctionDecl : public Declaration {
   std::unique_ptr<NodeList> Params;
+  std::unique_ptr<Expression> WhenExpr;
 
 public:
-  FunctionDecl(std::string Id, NodeList *P, Expression *E)
-      : Declaration(NK_FunctionDecl, std::move(Id), E), Params(P) {}
+  FunctionDecl(std::string Id, NodeList *ParamList, Expression *Init,
+               Expression *When = nullptr)
+      : Declaration(NK_FunctionDecl, std::move(Id), Init), Params(ParamList),
+        WhenExpr(When) {}
 
   NodeList *getParamList() { return Params.get(); }
   FuncParamDecl *getParam(size_t I) {
@@ -309,9 +318,7 @@ public:
                            [](FuncParamDecl *Decl) { return Decl->getType(); });
   }
 
-  bool isExtern() const { return !getInitializer(); }
-  bool isInstance() const { return !getParamCount() || getParam(0)->getType(); }
-  bool isTemplate() { return !isExtern() && !isInstance(); }
+  bool isPureTemplate() { return getParamCount(); }
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
@@ -327,7 +334,7 @@ public:
 class FunctionCall : public Expression {
   std::unique_ptr<ASTNode> Callee;
   std::unique_ptr<NodeList> Args;
-  FunctionDecl *CalleeDecl;
+  CallableFunction *CalleeFunc = nullptr;
 
 public:
   FunctionCall(ASTNode *C, NodeList *ArgList)
@@ -344,8 +351,8 @@ public:
   size_t getArgCount() const { return Args->size(); }
 
   /* Set by Sema */
-  void setCalleeDecl(FunctionDecl *Decl) { CalleeDecl = Decl; }
-  FunctionDecl *getCalleeDecl() { return CalleeDecl; }
+  void setCalleeFunc(CallableFunction *F) { CalleeFunc = F; }
+  CallableFunction *getCalleeFunc() { return CalleeFunc; }
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
@@ -374,6 +381,64 @@ public:
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_BuiltinTypeExpr;
+  }
+};
+
+class CallableFunction : private NonCopyable {
+public:
+  enum CallableType { CF_TemplateInstance, CF_ExternFunction };
+
+private:
+  CallableType CT;
+  llvm::Function *Callee;
+
+public:
+  CallableFunction(CallableType T) : CT(T) {}
+  virtual ~CallableFunction() {}
+  virtual const std::string &getId() const = 0;
+
+  CallableType getCallableType() const { return CT; }
+
+  void setCallee(llvm::Function *C) { Callee = C; }
+  llvm::Function *getCallee() { return Callee; }
+};
+
+/* Instance of potentially template, potentially multi-domain function.
+ * Created by Sema, ready for Codegen */
+class TemplateInstance : public CallableFunction {
+  std::vector<std::unique_ptr<FunctionDecl>> Domains;
+  std::string MangledId;
+
+public:
+  TemplateInstance(FunctionDecl *Domain)
+      : CallableFunction(CF_TemplateInstance), MangledId(Domain->getId()) {
+    appendDomain(Domain);
+  }
+  void appendDomain(FunctionDecl *Decl) { Domains.emplace_back(Decl); }
+  auto getDomains() {
+    return llvm::map_range(Domains, [](auto &&D) { return D.get(); });
+  }
+  FunctionDecl *getDomain(size_t Idx) { return Domains[Idx].get(); }
+  bool isMultiDomain() const { return Domains.size() > 1; }
+  auto getParamTypes() { return Domains.front()->getParamTypes(); }
+
+  /* Definitions on all domains must have the same return type */
+  Type *getReturnType() { return Domains.front()->getInitializer()->getType(); }
+
+  // TODO: build mangled id based on parameter types
+  void setIdPrefix(const std::string &P) { MangledId = P + MangledId; }
+  const std::string &getId() const override { return MangledId; }
+
+  static bool classof(const CallableFunction *F) {
+    return F->getCallableType() == CF_TemplateInstance;
+  }
+};
+
+/* Emitted by Sema to handle extern-expression-s */
+class ExternFunction : public CallableFunction {
+public:
+  static bool classof(const CallableFunction *F) {
+    return F->getCallableType() == CF_ExternFunction;
   }
 };
 

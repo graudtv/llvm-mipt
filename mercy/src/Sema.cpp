@@ -49,7 +49,7 @@ void Sema::insertDecl(Declaration *Decl) {
   CurScope.insert(std::make_pair(Decl->getId(), Decl));
 }
 
-FunctionDecl *
+TemplateInstance *
 Sema::getOrCreateFunctionInstance(FunctionDecl *FD,
                                   llvm::ArrayRef<Type *> ParamTys) {
   InstanceList &Instances = FunctionInstances[FD];
@@ -61,18 +61,29 @@ Sema::getOrCreateFunctionInstance(FunctionDecl *FD,
 
   /* Instantiate function */
   unsigned InstanceId = Instances.size();
-  FunctionDecl *Instance = FD->clone();
+  FunctionDecl *Domain = FD->clone();
+  TemplateInstance *Instance = new TemplateInstance(Domain);
   Instances.emplace_back(Instance);
 
-  Instance->addIdPrefix("__" + std::to_string(InstanceId) + "_");
+  Instance->setIdPrefix("__" + std::to_string(InstanceId) + "_");
   for (size_t I = 0; I < ParamTys.size(); ++I)
-    Instance->getParam(I)->setType(ParamTys[I]);
+    Domain->getParam(I)->setType(ParamTys[I]);
 
+  // TODO: variables handled in the wrong scope here
   pushScope();
-  llvm::for_each(Instance->getParams(),
+  llvm::for_each(Domain->getParams(),
                  [this](FuncParamDecl *D) { D->sema(*this); });
-  Instance->getInitializer()->sema(*this);
+  Domain->getInitializer()->sema(*this);
+  if (Domain->getInitializer()->getType() != Instance->getReturnType()) {
+    emitError(
+        FD,
+        "function returns values of different types in different domains: '" +
+            Domain->getInitializer()->getType()->toString() +
+            "' vs previously used type '" +
+            Instance->getReturnType()->toString());
+  }
   popScope();
+  AllInstances.push_back(Instance);
   return Instance;
 }
 
@@ -161,9 +172,9 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
       emitError(Callee, "call to undeclared function '" + Id->getName() + "'");
     assert(llvm::isa<FunctionDecl>(Decl) && "reference calls not implemented");
     FunctionDecl *FD = llvm::cast<FunctionDecl>(Decl);
-    FunctionDecl *Instance = getOrCreateFunctionInstance(FD, ArgTys);
-    FC->setCalleeDecl(Instance);
-    FC->setType(Instance->getInitializer()->getType());
+    TemplateInstance *Instance = getOrCreateFunctionInstance(FD, ArgTys);
+    FC->setCalleeFunc(Instance);
+    FC->setType(Instance->getReturnType());
     return;
   };
   assert(0 && "not implemented: cannot handle call");
@@ -194,8 +205,4 @@ void Sema::run(ASTNode *TU) {
     S->sema(*this);
   Scopes.pop_back();
   assert(Scopes.empty() && "bug in scope processing");
-
-  for (auto &&[Decl, Instances] : FunctionInstances)
-    for (auto &&I : Instances)
-      llvm::cast<NodeList>(TU)->append(I.release());
 }

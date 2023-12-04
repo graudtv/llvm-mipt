@@ -39,9 +39,11 @@ uint8           { return TK_uint8; }
 uint16          { return TK_uint16; }
 uint32          { return TK_uint32; }
 uint64          { return TK_uint64; }
+
   /* Other keywords */
 let             { return TK_let; }
 return          { return TK_return; }
+when            { return TK_when; }
 
   /* identifier */
 [a-zA-Z_.]+     { yylval.TK_identifier = strdup(yytext); return TK_identifier; }

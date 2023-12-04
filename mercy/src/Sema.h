@@ -8,18 +8,22 @@ namespace mercy {
 
 class Sema {
   using Scope = std::unordered_map<std::string, Declaration *>;
-  using InstanceList = std::vector<std::unique_ptr<FunctionDecl>>;
+  using InstanceList = std::vector<std::unique_ptr<TemplateInstance>>;
 
   std::vector<Scope> Scopes;
   std::unordered_map<FunctionDecl *, InstanceList> FunctionInstances;
+
+  /* Supplementary list which keeps track of all instantiations */
+  std::vector<TemplateInstance *> AllInstances;
 
   Declaration *findDecl(const std::string &Id);
   void insertDecl(Declaration *Decl);
   void pushScope() { Scopes.emplace_back(); }
   void popScope() { Scopes.pop_back(); }
 
-  FunctionDecl *getOrCreateFunctionInstance(FunctionDecl *FD,
-                                          llvm::ArrayRef<Type *> ParamTys);
+  TemplateInstance *
+  getOrCreateFunctionInstance(FunctionDecl *FD,
+                              llvm::ArrayRef<Type *> ParamTys);
 
 public:
   void actOnBinaryOperator(BinaryOperator *BinOp);
@@ -31,6 +35,8 @@ public:
   void actOnIdentifier(Identifier *Id);
 
   void run(ASTNode *TU);
+
+  const auto &getGlobalFunctions() { return AllInstances; }
 };
 
 } // namespace mercy

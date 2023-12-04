@@ -130,8 +130,8 @@ void FunctionDecl::print(llvm::raw_ostream &Os, unsigned Shift) const {
 }
 
 FunctionDecl *FunctionDecl::clone() const {
-  return new FunctionDecl(getId(), Params->clone(),
-                                 getInitializer()->clone());
+  return new FunctionDecl(getId(), Params->clone(), getInitializer()->clone(),
+                          WhenExpr ? WhenExpr->clone() : nullptr);
 }
 
 void FunctionCall::print(llvm::raw_ostream &Os, unsigned Shift) const {

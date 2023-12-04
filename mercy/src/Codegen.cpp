@@ -1,5 +1,6 @@
 #include "AST.h"
 #include "Codegen.h"
+#include "Sema.h"
 #include <llvm/Support/ErrorHandling.h>
 
 using namespace mercy;
@@ -22,13 +23,13 @@ VISIT_NODE(BinaryOperator)
 VISIT_NODE(UnaryOperator)
 VISIT_NODE(FunctionCall)
 VISIT_NODE(VariableDecl)
-VISIT_NODE(FuncParamDecl)
 VISIT_NODE(Identifier)
 
 SKIP_NODE(BuiltinTypeExpr)
+SKIP_NODE(FunctionDecl)
 
 UNREACHABLE_NODE(NodeList)
-VISIT_NODE(FunctionDecl)
+UNREACHABLE_NODE(FuncParamDecl)
 
 namespace {
 
@@ -80,24 +81,19 @@ llvm::FunctionCallee Codegen::getOrInsertPrintFunc(BuiltinType *Ty) {
   llvm_unreachable("unhandled builtin type");
 }
 
-llvm::FunctionCallee Codegen::getOrInsertFuncDecl(FunctionDecl *FD) {
-  if (FD->isTemplate())
-    return {};
-  assert(FD->isInstance() && "extern not implemented");
-
+llvm::FunctionCallee Codegen::insertInstanceDecl(TemplateInstance *Instance) {
   // TODO: Handle non-builtin return types
-  assert(FD->getInitializer()->getType());
-  assert(llvm::isa<BuiltinType>(FD->getInitializer()->getType()));
-  BuiltinType *RetTy = llvm::cast<BuiltinType>(FD->getInitializer()->getType());
+  assert(llvm::isa<BuiltinType>(Instance->getReturnType()));
+  BuiltinType *RetTy = llvm::cast<BuiltinType>(Instance->getReturnType());
 
   // TODO: Handle non-builtin parameter types
   std::vector<llvm::Type *> ParamTys;
   llvm::transform(
-      FD->getParamTypes(), std::back_inserter(ParamTys),
+      Instance->getParamTypes(), std::back_inserter(ParamTys),
       [this](Type *T) { return llvm::cast<BuiltinType>(T)->getLLVMType(Ctx); });
   llvm::FunctionType *FuncTy =
       llvm::FunctionType::get(RetTy->getLLVMType(Ctx), ParamTys, false);
-  return M->getOrInsertFunction(FD->getId(), FuncTy);
+  return M->getOrInsertFunction(Instance->getId(), FuncTy);
 }
 
 Codegen::Codegen() : Ctx(), Builder(Ctx) {
@@ -192,7 +188,7 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
   auto &Id = llvm::cast<Identifier>(Callee)->getName();
   if (Id == "print") {
     if (FC->getArgCount() != 1)
-      emitError(Callee, "invalid number of arguments in print() call");
+      emitError(FC, "invalid number of arguments in print() call");
     Expression *Arg = FC->getArg(0);
     llvm::FunctionCallee PrintFunc;
     if (auto *BuiltinTy = llvm::dyn_cast<BuiltinType>(Arg->getType())) {
@@ -210,7 +206,7 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
       emitError(Callee, "cannot print argument of non-builtin type");
     }
   }
-  return Builder.CreateCall(getOrInsertFuncDecl(FC->getCalleeDecl()),
+  return Builder.CreateCall(M->getFunction(FC->getCalleeFunc()->getId()),
                             Arguments);
 }
 
@@ -227,12 +223,10 @@ llvm::Value *Codegen::emitVariableDecl(VariableDecl *Decl) {
   return nullptr;
 }
 
-llvm::Value *Codegen::emitFunctionDecl(FunctionDecl *Decl) {
-  if (Decl->isTemplate())
-    return nullptr;
-  assert(Decl->isInstance() && "extern not implemented");
+void Codegen::emitTemplateInstance(TemplateInstance *Instance) {
+  FunctionDecl *Decl = Instance->getDomain(0);
   llvm::Function *Func =
-      llvm::cast<llvm::Function>(getOrInsertFuncDecl(Decl).getCallee());
+      llvm::cast<llvm::Function>(insertInstanceDecl(Instance).getCallee());
   llvm::BasicBlock *EntryBB = llvm::BasicBlock::Create(Ctx, "", Func);
 
   Builder.SetInsertPoint(EntryBB);
@@ -247,10 +241,7 @@ llvm::Value *Codegen::emitFunctionDecl(FunctionDecl *Decl) {
     Builder.CreateStore(Func->getArg(I), Param->getAddr());
   }
   Builder.CreateRet(Decl->getInitializer()->codegen(*this));
-  return nullptr;
 }
-
-llvm::Value *Codegen::emitFuncParamDecl(FuncParamDecl *Decl) { return nullptr; }
 
 llvm::Value *Codegen::emitIdentifier(Identifier *Id) {
   assert(llvm::isa<BuiltinType>(Id->getType()) &&
@@ -260,8 +251,11 @@ llvm::Value *Codegen::emitIdentifier(Identifier *Id) {
                             Id->getDeclaration()->getAddr());
 }
 
-void Codegen::run(ASTNode *AST) {
+void Codegen::run(ASTNode *AST, Sema &S) {
   M = std::make_unique<llvm::Module>("top", Ctx);
+
+  for (TemplateInstance *Instance : S.getGlobalFunctions())
+    emitTemplateInstance(Instance);
 
   llvm::FunctionType *MainFuncTy =
       llvm::FunctionType::get(Builder.getInt32Ty(), false);
@@ -271,8 +265,7 @@ void Codegen::run(ASTNode *AST) {
   Builder.SetInsertPoint(EntryBB);
   auto Statements = llvm::cast<NodeList>(AST)->getNodes();
   for (auto S : Statements)
-    if (!llvm::isa<FunctionDecl>(S))
-      S->codegen(*this);
+    S->codegen(*this);
   Builder.CreateRet(Builder.getInt32(0));
   for (auto S : Statements)
     if (llvm::isa<FunctionDecl>(S))

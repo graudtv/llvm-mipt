@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     AST->print(llvm::errs());
 
   Codegen Gen;
-  Gen.run(AST.get());
+  Gen.run(AST.get(), S);
   std::unique_ptr<llvm::Module> M = Gen.takeResult();
   if (OptS && OptEmitLLVM) {
     OS << *M;
