@@ -116,7 +116,7 @@ multiplicative-expression
     | multiplicative-expression '%' prefix-expression { $$ = new BinaryOperator(BinaryOperator::REM, $1, $3); }
     | prefix-expression
 prefix-expression
-    : '!' postfix-expression { $$ = new UnaryOperator(UnaryOperator::NEG, $2); }
+    : '!' postfix-expression { $$ = new UnaryOperator(UnaryOperator::NOT, $2); }
     | postfix-expression
 
 postfix-expression

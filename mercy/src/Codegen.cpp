@@ -150,8 +150,8 @@ llvm::Value *Codegen::emitBinaryOperator(BinaryOperator *BinOp) {
 
 llvm::Value *Codegen::emitUnaryOperator(UnaryOperator *Op) {
   llvm::Value *Expr = Op->getExpr()->codegen(*this);
-  if (Op->getKind() == UnaryOperator::NEG)
-    return Builder.CreateNeg(Expr);
+  if (Op->getKind() == UnaryOperator::NOT)
+    return Builder.CreateICmpEQ(Expr, Builder.getInt1(false));
   llvm_unreachable("unhandled unary operator kind");
 }
 

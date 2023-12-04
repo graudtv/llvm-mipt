@@ -38,7 +38,7 @@ const char *getBinaryOpKindStr(BinaryOperator::BinOpKind Kind) {
 
 const char *getUnaryOpKindStr(UnaryOperator::UnaryOpKind Kind) {
   switch (Kind) {
-  case UnaryOperator::NEG:
+  case UnaryOperator::NOT:
     return "!";
   }
   llvm_unreachable("Invalid unary operator kind");

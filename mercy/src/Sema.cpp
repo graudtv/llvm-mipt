@@ -99,9 +99,10 @@ void Sema::actOnBinaryOperator(BinaryOperator *BinOp) {
 
 void Sema::actOnUnaryOperator(UnaryOperator *Op) {
   Expression *Expr = Op->getExpr();
-  if (Op->getKind() == UnaryOperator::NEG) {
+  Expr->sema(*this);
+  if (Op->getKind() == UnaryOperator::NOT) {
     if (Expr->getType() != BuiltinType::getBoolTy())
-      emitError(Op, "invalid operand in negation, must be boolean");
+      emitError(Op, "invalid operand in '!' operator, must be boolean");
     Op->setType(Expr->getType());
     return;
   }

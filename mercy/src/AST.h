@@ -128,7 +128,7 @@ public:
 
 class UnaryOperator : public Expression {
 public:
-  enum UnaryOpKind { NEG };
+  enum UnaryOpKind { NOT };
 
 private:
   UnaryOpKind Kind;
