@@ -312,6 +312,7 @@ public:
   }
   auto getParams() { return Params->getNodesAs<FuncParamDecl>(); }
   size_t getParamCount() const { return Params->size(); }
+  Expression *getWhenExpr() const { return WhenExpr.get(); }
 
   auto getParamTypes() {
     return llvm::map_range(getParams(),
@@ -418,6 +419,7 @@ public:
   auto getDomains() {
     return llvm::map_range(Domains, [](auto &&D) { return D.get(); });
   }
+  size_t getDomainCount() const { return Domains.size(); }
   FunctionDecl *getDomain(size_t Idx) { return Domains[Idx].get(); }
   bool isMultiDomain() const { return Domains.size() > 1; }
   auto getParamTypes() { return Domains.front()->getParamTypes(); }

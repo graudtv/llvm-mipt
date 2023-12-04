@@ -224,14 +224,15 @@ llvm::Value *Codegen::emitVariableDecl(VariableDecl *Decl) {
 }
 
 void Codegen::emitTemplateInstance(TemplateInstance *Instance) {
-  FunctionDecl *Decl = Instance->getDomain(0);
   llvm::Function *Func =
       llvm::cast<llvm::Function>(insertInstanceDecl(Instance).getCallee());
   llvm::BasicBlock *EntryBB = llvm::BasicBlock::Create(Ctx, "", Func);
-
+  FunctionDecl *FrontDomain = Instance->getDomain(0);
   Builder.SetInsertPoint(EntryBB);
-  for (size_t I = 0; I < Decl->getParamCount(); ++I) {
-    FuncParamDecl *Param = Decl->getParam(I);
+
+  /* Create alloca for each function parameter */
+  for (size_t I = 0; I < FrontDomain->getParamCount(); ++I) {
+    FuncParamDecl *Param = FrontDomain->getParam(I);
     Func->getArg(I)->setName(Param->getId());
     assert(llvm::isa<BuiltinType>(Param->getType()) &&
            "only builtin types implemented");
@@ -240,7 +241,41 @@ void Codegen::emitTemplateInstance(TemplateInstance *Instance) {
     Param->setAddr(Builder.CreateAlloca(Ty, nullptr, Param->getId() + ".copy"));
     Builder.CreateStore(Func->getArg(I), Param->getAddr());
   }
-  Builder.CreateRet(Decl->getInitializer()->codegen(*this));
+  /* Handle each domain */
+  for (FunctionDecl *Domain : Instance->getDomains()) {
+    llvm::BasicBlock *NextBB = nullptr;
+    /* Bind parameters to addresses */
+    for (size_t I = 0; I < FrontDomain->getParamCount(); ++I)
+      Domain->getParam(I)->setAddr(FrontDomain->getParam(I)->getAddr());
+    /* Emit WhenExpr if exists */
+    if (Expression *WhenExpr = Domain->getWhenExpr()) {
+      llvm::Value *Cond = WhenExpr->codegen(*this);
+      llvm::BasicBlock *TrueBB = llvm::BasicBlock::Create(Ctx, "domain", Func);
+      NextBB = llvm::BasicBlock::Create(Ctx, "next", Func);
+      Builder.CreateCondBr(Cond, TrueBB, NextBB);
+      Builder.SetInsertPoint(TrueBB);
+    }
+    /* Generate function body */
+    Builder.CreateRet(Domain->getInitializer()->codegen(*this));
+    /* Move to the next domain */
+    if (NextBB)
+      Builder.SetInsertPoint(NextBB);
+  }
+  /* Emit domain error */
+  if (Instance->getDomainCount() > 1 || Instance->getDomain(0)->getWhenExpr()) {
+    llvm::FunctionCallee Puts = M->getOrInsertFunction(
+        "puts", Builder.getInt32Ty(), Builder.getInt8Ty()->getPointerTo());
+    llvm::FunctionCallee Exit = M->getOrInsertFunction(
+        "exit", Builder.getVoidTy(), Builder.getInt32Ty());
+    Builder.CreateCall(Puts, Builder.CreateGlobalStringPtr(
+                                 "Error: domain error in function '" +
+                                 Instance->getId() + "'"));
+    Builder.CreateCall(Exit, Builder.getInt32(1));
+    assert(llvm::isa<BuiltinType>(Instance->getReturnType()) &&
+           "only builtin types implemented");
+    BuiltinType *RetTy = llvm::cast<BuiltinType>(Instance->getReturnType());
+    Builder.CreateRet(llvm::PoisonValue::get(RetTy->getLLVMType(Ctx)));
+  }
 }
 
 llvm::Value *Codegen::emitIdentifier(Identifier *Id) {

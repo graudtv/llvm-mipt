@@ -73,6 +73,8 @@ Sema::getOrCreateFunctionInstance(FunctionDecl *FD,
   pushScope();
   llvm::for_each(Domain->getParams(),
                  [this](FuncParamDecl *D) { D->sema(*this); });
+  if (Expression *WhenExpr = Domain->getWhenExpr())
+    WhenExpr->sema(*this);
   Domain->getInitializer()->sema(*this);
   if (Domain->getInitializer()->getType() != Instance->getReturnType()) {
     emitError(
