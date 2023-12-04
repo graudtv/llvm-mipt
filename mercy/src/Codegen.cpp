@@ -115,6 +115,10 @@ llvm::Value *Codegen::emitBinaryOperator(BinaryOperator *BinOp) {
   BuiltinType *ResTy = llvm::cast<BuiltinType>(BinOp->getType());
   BuiltinType *OperandTy = llvm::cast<BuiltinType>(BinOp->getLHS()->getType());
   switch (BinOp->getKind()) {
+  case BinaryOperator::LOR:
+    return Builder.CreateLogicalOr(LHS, RHS);
+  case BinaryOperator::LAND:
+    return Builder.CreateLogicalAnd(LHS, RHS);
   case BinaryOperator::OR:
     return Builder.CreateOr(LHS, RHS);
   case BinaryOperator::XOR:

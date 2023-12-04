@@ -89,18 +89,25 @@ void Sema::actOnBinaryOperator(BinaryOperator *BinOp) {
   if (LHS->getType() != RHS->getType())
     emitError(LHS, "operands of binary operator have different types");
   BuiltinType *OperandType = llvm::cast<BuiltinType>(LHS->getType());
-  if (!OperandType->isInteger())
-    emitError(BinOp, "invalid operand in binary operator, must be integer");
   BinaryOperator::BinOpKind BK = BinOp->getKind();
+  bool IsLogicalOp = (BK == BinaryOperator::LOR || BK == BinaryOperator::LAND);
   bool IsBitOp = (BK == BinaryOperator::OR || BK == BinaryOperator::XOR ||
                   BK == BinaryOperator::AND);
-  if (IsBitOp && !OperandType->isUnsigned())
-    emitError(BinOp, llvm::Twine{"operands of '"} + BinOp->getMnemonic() +
-                         "' must be unsigned\n");
   bool IsCmp = (BK == BinaryOperator::EQ || BK == BinaryOperator::NE ||
                 BK == BinaryOperator::LT || BK == BinaryOperator::GT ||
                 BK == BinaryOperator::LE || BK == BinaryOperator::GE);
-  BinOp->setType(IsCmp ? BuiltinType::getBoolTy() : OperandType);
+  if (IsLogicalOp && !OperandType->isBool())
+    emitError(BinOp, llvm::Twine{"invalid operand types for operator '"} +
+                         BinOp->getMnemonic() + "', must be booleans");
+  if (!IsLogicalOp && !OperandType->isInteger())
+    emitError(BinOp, llvm::Twine{"invalid operand types for operator '"} +
+                         BinOp->getMnemonic() + "', must be integers");
+  if (IsBitOp && !OperandType->isUnsigned()) {
+    emitError(BinOp, llvm::Twine{"invalid operand types for operator '"} +
+                         BinOp->getMnemonic() + "', must be unsigned");
+  }
+  BinOp->setType((IsCmp || IsLogicalOp) ? BuiltinType::getBoolTy()
+                                        : OperandType);
 }
 
 void Sema::actOnUnaryOperator(UnaryOperator *Op) {

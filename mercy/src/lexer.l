@@ -17,6 +17,8 @@ namespace mercy { class ASTNode; class NodeList; class Expression; }
 [-]?[0-9]+      {yylval.TK_inum = atoi(yytext); return TK_inum; }
 
   /* multicharacter operators */
+"||"              { return TK_LOR; }
+"&&"              { return TK_LAND; }
 "=="              { return TK_EQ; }
 "!="              { return TK_NE; }
 "<="              { return TK_LE; }

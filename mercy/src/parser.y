@@ -25,6 +25,8 @@ static std::unique_ptr<ASTNode> ParserResult;
 
 %token<int> inum "integer";
 %token<char *> identifier "identifier";
+%token LOR "||";
+%token LAND "&&";
 %token EQ "==";
 %token NE "!=";
 %token LE "<=";
@@ -43,6 +45,8 @@ static std::unique_ptr<ASTNode> ParserResult;
 
 %nterm<mercy::Expression *>
   expression
+  logical-or-expression
+  logical-and-expression
   or-expression
   xor-expression
   and-expression
@@ -100,8 +104,13 @@ function-parameter
 
 
 expression
-    : or-expression
-
+    : logical-or-expression
+logical-or-expression
+    : logical-or-expression "||" logical-and-expression { $$ = new BinaryOperator(BinaryOperator::LOR, $1, $3); }
+    | logical-and-expression
+logical-and-expression
+    : logical-and-expression "&&" or-expression { $$ = new BinaryOperator(BinaryOperator::LAND, $1, $3); }
+    | or-expression
 or-expression
     : or-expression '|' xor-expression { $$ = new BinaryOperator(BinaryOperator::OR, $1, $3); }
     | xor-expression
