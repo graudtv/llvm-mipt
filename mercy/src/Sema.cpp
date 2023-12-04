@@ -92,7 +92,8 @@ void Sema::actOnBinaryOperator(BinaryOperator *BinOp) {
   if (!OperandType->isInteger())
     emitError(BinOp, "invalid operand in binary operator, must be integer");
   BinaryOperator::BinOpKind BK = BinOp->getKind();
-  bool isCmp = (BK == BinaryOperator::LT || BK == BinaryOperator::GT ||
+  bool isCmp = (BK == BinaryOperator::EQ || BK == BinaryOperator::NE ||
+                BK == BinaryOperator::LT || BK == BinaryOperator::GT ||
                 BK == BinaryOperator::LE || BK == BinaryOperator::GE);
   BinOp->setType(isCmp ? BuiltinType::getBoolTy() : OperandType);
 }

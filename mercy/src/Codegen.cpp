@@ -115,6 +115,10 @@ llvm::Value *Codegen::emitBinaryOperator(BinaryOperator *BinOp) {
   BuiltinType *ResTy = llvm::cast<BuiltinType>(BinOp->getType());
   BuiltinType *OperandTy = llvm::cast<BuiltinType>(BinOp->getLHS()->getType());
   switch (BinOp->getKind()) {
+  case BinaryOperator::EQ:
+    return Builder.CreateICmpEQ(LHS, RHS);
+  case BinaryOperator::NE:
+    return Builder.CreateICmpNE(LHS, RHS);
   case BinaryOperator::LE:
     return (OperandTy->isSigned()) ? Builder.CreateICmpSLE(LHS, RHS)
                                    : Builder.CreateICmpULE(LHS, RHS);

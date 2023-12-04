@@ -25,6 +25,8 @@ static std::unique_ptr<ASTNode> ParserResult;
 
 %token<int> inum "integer";
 %token<char *> identifier "identifier";
+%token EQ "==";
+%token NE "!=";
 %token LE "<=";
 %token GE ">=";
 %token LSHIFT "<<";
@@ -41,6 +43,7 @@ static std::unique_ptr<ASTNode> ParserResult;
 
 %nterm<mercy::Expression *>
   expression
+  equality-expression
   relational-expression
   shift-expression
   additive-expression
@@ -94,8 +97,12 @@ function-parameter
 
 
 expression
-    : relational-expression
+    : equality-expression
 
+equality-expression
+    : equality-expression "==" relational-expression { $$ = new BinaryOperator(BinaryOperator::EQ, $1, $3); }
+    | equality-expression "!=" relational-expression { $$ = new BinaryOperator(BinaryOperator::NE, $1, $3); }
+    | relational-expression
 relational-expression
     : relational-expression '<' shift-expression { $$ = new BinaryOperator(BinaryOperator::LT, $1, $3); }
     | relational-expression '>' shift-expression { $$ = new BinaryOperator(BinaryOperator::GT, $1, $3); }

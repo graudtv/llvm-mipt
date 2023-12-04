@@ -99,7 +99,12 @@ public:
 
 class BinaryOperator : public Expression {
 public:
-  enum BinOpKind { LT, GT, LE, GE, LSHIFT, RSHIFT, ADD, SUB, MUL, DIV, REM };
+  // clang-format off
+  enum BinOpKind {
+    EQ, NE, LT, GT, LE, GE, LSHIFT, RSHIFT,
+    ADD, SUB, MUL, DIV, REM
+  };
+  // clang-format on
 
 private:
   BinOpKind Kind;
