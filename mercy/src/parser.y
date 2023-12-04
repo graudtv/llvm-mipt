@@ -43,6 +43,9 @@ static std::unique_ptr<ASTNode> ParserResult;
 
 %nterm<mercy::Expression *>
   expression
+  or-expression
+  xor-expression
+  and-expression
   equality-expression
   relational-expression
   shift-expression
@@ -97,8 +100,17 @@ function-parameter
 
 
 expression
-    : equality-expression
+    : or-expression
 
+or-expression
+    : or-expression '|' xor-expression { $$ = new BinaryOperator(BinaryOperator::OR, $1, $3); }
+    | xor-expression
+xor-expression
+    : xor-expression '^' and-expression { $$ = new BinaryOperator(BinaryOperator::XOR, $1, $3); }
+    | and-expression
+and-expression
+    : and-expression '&' equality-expression { $$ = new BinaryOperator(BinaryOperator::AND, $1, $3); }
+    | equality-expression
 equality-expression
     : equality-expression "==" relational-expression { $$ = new BinaryOperator(BinaryOperator::EQ, $1, $3); }
     | equality-expression "!=" relational-expression { $$ = new BinaryOperator(BinaryOperator::NE, $1, $3); }

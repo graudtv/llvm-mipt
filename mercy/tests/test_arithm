@@ -127,9 +127,24 @@ test_case(name => "neq",
   expect => "0\n0\n0\n1"
 );
 
-test_case(name => "neg",
+test_case(name => "not",
   source => "print(!(1 < 1)); print(!(1 < 2));",
   expect => "1\n0"
+);
+
+test_case(name => "or",
+  source => "print(uint(0xff00) | uint(0xf00f));",
+  expect => 0xff0f
+);
+
+test_case(name => "xor",
+  source => "print(uint(0xff00) ^ uint(0xf00f));",
+  expect => 0xf0f
+);
+
+test_case(name => "and",
+  source => "print(uint(0xff00) & uint(0xf00f));",
+  expect => 0xf000
 );
 
 test_case(name => "arithm_expr",

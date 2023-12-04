@@ -101,6 +101,7 @@ class BinaryOperator : public Expression {
 public:
   // clang-format off
   enum BinOpKind {
+    OR, XOR, AND,
     EQ, NE, LT, GT, LE, GE, LSHIFT, RSHIFT,
     ADD, SUB, MUL, DIV, REM
   };

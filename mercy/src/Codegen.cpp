@@ -115,6 +115,12 @@ llvm::Value *Codegen::emitBinaryOperator(BinaryOperator *BinOp) {
   BuiltinType *ResTy = llvm::cast<BuiltinType>(BinOp->getType());
   BuiltinType *OperandTy = llvm::cast<BuiltinType>(BinOp->getLHS()->getType());
   switch (BinOp->getKind()) {
+  case BinaryOperator::OR:
+    return Builder.CreateOr(LHS, RHS);
+  case BinaryOperator::XOR:
+    return Builder.CreateXor(LHS, RHS);
+  case BinaryOperator::AND:
+    return Builder.CreateAnd(LHS, RHS);
   case BinaryOperator::EQ:
     return Builder.CreateICmpEQ(LHS, RHS);
   case BinaryOperator::NE:
@@ -155,7 +161,7 @@ llvm::Value *Codegen::emitBinaryOperator(BinaryOperator *BinOp) {
 llvm::Value *Codegen::emitUnaryOperator(UnaryOperator *Op) {
   llvm::Value *Expr = Op->getExpr()->codegen(*this);
   if (Op->getKind() == UnaryOperator::NOT)
-    return Builder.CreateICmpEQ(Expr, Builder.getInt1(false));
+    return Builder.CreateNot(Expr);
   llvm_unreachable("unhandled unary operator kind");
 }
 

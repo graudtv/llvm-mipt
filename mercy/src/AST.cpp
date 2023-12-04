@@ -20,6 +20,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &Os, const tabulate &T) {
 const char *getBinaryOpKindStr(BinaryOperator::BinOpKind Kind) {
   // clang-format off
   switch (Kind) {
+  case BinaryOperator::OR: return "|";
+  case BinaryOperator::XOR: return "^";
+  case BinaryOperator::AND: return "&";
   case BinaryOperator::EQ: return "==";
   case BinaryOperator::NE: return "!=";
   case BinaryOperator::LT: return "<";
