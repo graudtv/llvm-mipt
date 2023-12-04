@@ -91,7 +91,10 @@ void Sema::actOnBinaryOperator(BinaryOperator *BinOp) {
   BuiltinType *OperandType = llvm::cast<BuiltinType>(LHS->getType());
   if (!OperandType->isInteger())
     emitError(BinOp, "invalid operand in binary operator, must be integer");
-  BinOp->setType(OperandType);
+  BinaryOperator::BinOpKind BK = BinOp->getKind();
+  bool isCmp = (BK == BinaryOperator::LT || BK == BinaryOperator::GT ||
+                BK == BinaryOperator::LE || BK == BinaryOperator::GE);
+  BinOp->setType(isCmp ? BuiltinType::getBoolTy() : OperandType);
 }
 
 void Sema::actOnUnaryOperator(UnaryOperator *Op) {

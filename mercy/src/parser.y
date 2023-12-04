@@ -25,6 +25,10 @@ static std::unique_ptr<ASTNode> ParserResult;
 
 %token<int> inum "integer";
 %token<char *> identifier "identifier";
+%token LE "<=";
+%token GE ">=";
+%token LSHIFT "<<";
+%token RSHIFT ">>";
 
 %token void bool int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64;
 %token let return
@@ -36,8 +40,10 @@ static std::unique_ptr<ASTNode> ParserResult;
   function-parameter
 
 %nterm<mercy::Expression *>
-  additive-expression
   expression
+  relational-expression
+  shift-expression
+  additive-expression
   multiplicative-expression
   prefix-expression
   postfix-expression
@@ -88,19 +94,27 @@ function-parameter
 
 
 expression
-    : additive-expression
+    : relational-expression
 
+relational-expression
+    : relational-expression '<' shift-expression { $$ = new BinaryOperator(BinaryOperator::LT, $1, $3); }
+    | relational-expression '>' shift-expression { $$ = new BinaryOperator(BinaryOperator::GT, $1, $3); }
+    | relational-expression "<=" shift-expression { $$ = new BinaryOperator(BinaryOperator::LE, $1, $3); }
+    | relational-expression ">=" shift-expression { $$ = new BinaryOperator(BinaryOperator::GE, $1, $3); }
+    | shift-expression
+shift-expression
+    : shift-expression "<<" additive-expression { $$ = new BinaryOperator(BinaryOperator::LSHIFT, $1, $3); }
+    | shift-expression ">>" additive-expression { $$ = new BinaryOperator(BinaryOperator::RSHIFT, $1, $3); }
+    | additive-expression
 additive-expression
     : additive-expression '+' multiplicative-expression { $$ = new BinaryOperator(BinaryOperator::ADD, $1, $3); }
     | additive-expression '-' multiplicative-expression { $$ = new BinaryOperator(BinaryOperator::SUB, $1, $3); }
     | multiplicative-expression
-
 multiplicative-expression
     : multiplicative-expression '*' prefix-expression { $$ = new BinaryOperator(BinaryOperator::MUL, $1, $3); }
     | multiplicative-expression '/' prefix-expression { $$ = new BinaryOperator(BinaryOperator::DIV, $1, $3); }
     | multiplicative-expression '%' prefix-expression { $$ = new BinaryOperator(BinaryOperator::REM, $1, $3); }
     | prefix-expression
-
 prefix-expression
     : '!' postfix-expression { $$ = new UnaryOperator(UnaryOperator::NEG, $2); }
     | postfix-expression

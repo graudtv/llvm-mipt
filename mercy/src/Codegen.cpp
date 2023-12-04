@@ -67,7 +67,7 @@ llvm::FunctionCallee Codegen::getOrInsertPrintFunc(llvm::Type *ValueTy,
 }
 
 llvm::FunctionCallee Codegen::getOrInsertPrintFunc(BuiltinType *Ty) {
-  if (Ty->isInt8() || Ty->isInt16() || Ty->isInt32())
+  if (Ty->isBool() || Ty->isInt8() || Ty->isInt16() || Ty->isInt32())
     return getOrInsertPrintFunc(Builder.getInt32Ty(), "i32", "%d\n");
   if (Ty->isUint8() || Ty->isUint16() || Ty->isUint32())
     return getOrInsertPrintFunc(Builder.getInt32Ty(), "u32", "%u\n");
@@ -112,20 +112,39 @@ llvm::Value *Codegen::emitBinaryOperator(BinaryOperator *BinOp) {
   llvm::Value *LHS = BinOp->getLHS()->codegen(*this);
   llvm::Value *RHS = BinOp->getRHS()->codegen(*this);
 
-  BuiltinType *OpTy = llvm::cast<BuiltinType>(BinOp->getType());
-  BinaryOperator::BinOpKind BK = BinOp->getKind();
-  if (BK == BinaryOperator::ADD)
+  BuiltinType *ResTy = llvm::cast<BuiltinType>(BinOp->getType());
+  BuiltinType *OperandTy = llvm::cast<BuiltinType>(BinOp->getLHS()->getType());
+  switch (BinOp->getKind()) {
+  case BinaryOperator::LE:
+    return (OperandTy->isSigned()) ? Builder.CreateICmpSLE(LHS, RHS)
+                                   : Builder.CreateICmpULE(LHS, RHS);
+  case BinaryOperator::GE:
+    return (OperandTy->isSigned()) ? Builder.CreateICmpSGE(LHS, RHS)
+                                   : Builder.CreateICmpUGE(LHS, RHS);
+  case BinaryOperator::LT:
+    return (OperandTy->isSigned()) ? Builder.CreateICmpSLT(LHS, RHS)
+                                   : Builder.CreateICmpULT(LHS, RHS);
+  case BinaryOperator::GT:
+    return (OperandTy->isSigned()) ? Builder.CreateICmpSGT(LHS, RHS)
+                                   : Builder.CreateICmpUGT(LHS, RHS);
+  case BinaryOperator::LSHIFT:
+    return Builder.CreateShl(LHS, RHS);
+  case BinaryOperator::RSHIFT:
+    return (ResTy->isSigned()) ? Builder.CreateAShr(LHS, RHS)
+                               : Builder.CreateLShr(LHS, RHS);
+  case BinaryOperator::ADD:
     return Builder.CreateAdd(LHS, RHS);
-  if (BK == BinaryOperator::SUB)
+  case BinaryOperator::SUB:
     return Builder.CreateSub(LHS, RHS);
-  if (BK == BinaryOperator::MUL)
+  case BinaryOperator::MUL:
     return Builder.CreateMul(LHS, RHS);
-  if (BK == BinaryOperator::DIV)
-    return (OpTy->isSigned()) ? Builder.CreateSDiv(LHS, RHS)
-                              : Builder.CreateUDiv(LHS, RHS);
-  if (BK == BinaryOperator::REM)
-    return (OpTy->isSigned()) ? Builder.CreateSRem(LHS, RHS)
-                              : Builder.CreateURem(LHS, RHS);
+  case BinaryOperator::DIV:
+    return (ResTy->isSigned()) ? Builder.CreateSDiv(LHS, RHS)
+                               : Builder.CreateUDiv(LHS, RHS);
+  case BinaryOperator::REM:
+    return (ResTy->isSigned()) ? Builder.CreateSRem(LHS, RHS)
+                               : Builder.CreateURem(LHS, RHS);
+  }
   llvm_unreachable("unhandled binary operator kind");
 }
 
@@ -167,8 +186,8 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
         emitError(Callee, "cannot print void");
       FC->setType(BuiltinType::getVoidTy());
       /* cast small integers to int32 / uint32 */
-      if (BuiltinTy->isInt8() || BuiltinTy->isInt16() || BuiltinTy->isUint8() ||
-          BuiltinTy->isUint16()) {
+      if (BuiltinTy->isBool() || BuiltinTy->isInt8() || BuiltinTy->isInt16() ||
+          BuiltinTy->isUint8() || BuiltinTy->isUint16()) {
         Arguments.front() = Builder.CreateIntCast(
             Arguments.front(), Builder.getInt32Ty(), BuiltinTy->isSigned());
       }
@@ -223,9 +242,8 @@ llvm::Value *Codegen::emitIdentifier(Identifier *Id) {
   assert(llvm::isa<BuiltinType>(Id->getType()) &&
          "only builtin types are implemented");
   BuiltinType *IdTy = llvm::cast<BuiltinType>(Id->getType());
-  return Builder.CreateLoad(
-      IdTy->getLLVMType(Ctx),
-      Id->getDeclaration()->getAddr());
+  return Builder.CreateLoad(IdTy->getLLVMType(Ctx),
+                            Id->getDeclaration()->getAddr());
 }
 
 void Codegen::run(ASTNode *AST) {

@@ -18,18 +18,21 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &Os, const tabulate &T) {
 }
 
 const char *getBinaryOpKindStr(BinaryOperator::BinOpKind Kind) {
+  // clang-format off
   switch (Kind) {
-  case BinaryOperator::ADD:
-    return "+";
-  case BinaryOperator::SUB:
-    return "-";
-  case BinaryOperator::MUL:
-    return "*";
-  case BinaryOperator::DIV:
-    return "/";
-  case BinaryOperator::REM:
-    return "%";
+  case BinaryOperator::LT: return "<";
+  case BinaryOperator::GT: return ">";
+  case BinaryOperator::LE: return "<=";
+  case BinaryOperator::GE: return ">=";
+  case BinaryOperator::LSHIFT: return "<<";
+  case BinaryOperator::RSHIFT: return ">>";
+  case BinaryOperator::ADD: return "+";
+  case BinaryOperator::SUB: return "-";
+  case BinaryOperator::MUL: return "*";
+  case BinaryOperator::DIV: return "/";
+  case BinaryOperator::REM: return "%";
   }
+  // clang-format on
   llvm_unreachable("Invalid binary operator kind");
 }
 

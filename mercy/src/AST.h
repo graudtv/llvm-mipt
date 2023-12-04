@@ -99,7 +99,7 @@ public:
 
 class BinaryOperator : public Expression {
 public:
-  enum BinOpKind { ADD, SUB, MUL, DIV, REM };
+  enum BinOpKind { LT, GT, LE, GE, LSHIFT, RSHIFT, ADD, SUB, MUL, DIV, REM };
 
 private:
   BinOpKind Kind;

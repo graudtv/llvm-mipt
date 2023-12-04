@@ -16,6 +16,12 @@ namespace mercy { class ASTNode; class NodeList; class Expression; }
 0[0-9]+         {yylval.TK_inum = strtol(yytext, nullptr, 8); return TK_inum; }
 [-]?[0-9]+      {yylval.TK_inum = atoi(yytext); return TK_inum; }
 
+  /* multicharacter operators */
+"<="              { return TK_LE; }
+">="              { return TK_GE; }
+"<<"              { return TK_LSHIFT; }
+">>"              { return TK_RSHIFT; }
+
   /* builtin types */
 void            { return TK_void; }
 bool            { return TK_bool; }
