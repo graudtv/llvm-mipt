@@ -18,8 +18,9 @@ using namespace mercy;
 VISIT_NODE(BinaryOperator)
 VISIT_NODE(UnaryOperator)
 VISIT_NODE(FunctionCall)
-VISIT_NODE(Declaration)
-VISIT_NODE(FunctionDeclaration)
+VISIT_NODE(VariableDecl)
+VISIT_NODE(FunctionDecl)
+VISIT_NODE(FuncParamDecl)
 VISIT_NODE(Identifier)
 
 SKIP_NODE(IntegralLiteral)
@@ -27,9 +28,52 @@ SKIP_NODE(IntegralLiteral)
 UNREACHABLE_NODE(BuiltinTypeExpr)
 UNREACHABLE_NODE(NodeList)
 
+namespace {
 void emitError(ASTNode *Node, const llvm::Twine &T) {
   llvm::errs() << "line " << Node->getLocation().LineNo << ": " << T << '\n';
   exit(1);
+}
+} // namespace
+
+Declaration *Sema::findDecl(const std::string &Id) {
+  for (auto ScopeIt = Scopes.rbegin(); ScopeIt != Scopes.rend(); ++ScopeIt)
+    if (auto DeclIt = ScopeIt->find(Id); DeclIt != ScopeIt->end())
+      return DeclIt->second;
+  return nullptr;
+}
+
+void Sema::insertDecl(Declaration *Decl) {
+  Scope &CurScope = Scopes.back();
+  if (auto It = CurScope.find(Decl->getId()); It != CurScope.end())
+    emitError(Decl, "redefinition of '" + Decl->getId() + "'");
+  CurScope.insert(std::make_pair(Decl->getId(), Decl));
+}
+
+FunctionDecl *
+Sema::getOrCreateFunctionInstance(FunctionDecl *FD,
+                                  llvm::ArrayRef<Type *> ParamTys) {
+  InstanceList &Instances = FunctionInstances[FD];
+  auto It = llvm::find_if(Instances, [ParamTys](auto &&I) {
+    return llvm::equal(I->getParamTypes(), ParamTys);
+  });
+  if (It != Instances.end())
+    return It->get();
+
+  /* Instantiate function */
+  unsigned InstanceId = Instances.size();
+  FunctionDecl *Instance = FD->clone();
+  Instances.emplace_back(Instance);
+
+  Instance->addIdPrefix("__" + std::to_string(InstanceId) + "_");
+  for (size_t I = 0; I < ParamTys.size(); ++I)
+    Instance->getParam(I)->setType(ParamTys[I]);
+
+  pushScope();
+  llvm::for_each(Instance->getParams(),
+                 [this](FuncParamDecl *D) { D->sema(*this); });
+  Instance->getInitializer()->sema(*this);
+  popScope();
+  return Instance;
 }
 
 void Sema::actOnBinaryOperator(BinaryOperator *BinOp) {
@@ -63,8 +107,12 @@ void Sema::actOnUnaryOperator(UnaryOperator *Op) {
 
 void Sema::actOnFunctionCall(FunctionCall *FC) {
   ASTNode *Callee = FC->getCallee();
-  for (Expression *Arg : FC->getArgs())
+  std::vector<Type *> ArgTys;
+
+  for (Expression *Arg : FC->getArgs()) {
     Arg->sema(*this);
+    ArgTys.push_back(Arg->getType());
+  }
 
   /* Handle type conversions */
   if (auto *BTE = llvm::dyn_cast<BuiltinTypeExpr>(Callee)) {
@@ -86,34 +134,51 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
     // TODO: array constructor
     assert(0 && "unimplemented or illegal cast");
   }
-  // TODO: handle function calls
-  FC->setType(BuiltinType::getVoidTy());
+  if (Identifier *Id = llvm::dyn_cast<Identifier>(Callee)) {
+    if (Id->getName() == "print") {
+      FC->setType(BuiltinType::getVoidTy());
+      return;
+    }
+    Declaration *Decl = findDecl(Id->getName());
+    if (!Decl)
+      emitError(Callee, "call to undeclared function '" + Id->getName() + "'");
+    assert(llvm::isa<FunctionDecl>(Decl) && "reference calls not implemented");
+    FunctionDecl *FD = llvm::cast<FunctionDecl>(Decl);
+    FunctionDecl *Instance = getOrCreateFunctionInstance(FD, ArgTys);
+    FC->setCalleeDecl(Instance);
+    FC->setType(Instance->getInitializer()->getType());
+    return;
+  };
+  assert(0 && "not implemented: cannot handle call");
 }
 
 /* Insert declaration into the current scope */
-void Sema::actOnDeclaration(Declaration *Decl) {
-  if (auto It = Decls.find(Decl->getId()); It != Decls.end())
-    emitError(Decl, "redefinition of '" + Decl->getId() + "'");
-  Decls[Decl->getId()] = Decl;
+void Sema::actOnVariableDecl(VariableDecl *Decl) {
+  insertDecl(Decl);
   Decl->getInitializer()->sema(*this);
 }
 
-void Sema::actOnFunctionDeclaration(FunctionDeclaration *FD) {
-
-}
+void Sema::actOnFunctionDecl(FunctionDecl *Decl) { insertDecl(Decl); }
+void Sema::actOnFuncParamDecl(FuncParamDecl *Decl) { insertDecl(Decl); }
 
 /* Lookup declaration and set type of identifier */
 void Sema::actOnIdentifier(Identifier *Id) {
-  auto It = Decls.find(Id->getName());
-  if (It == Decls.end())
+  Declaration *Decl = findDecl(Id->getName());
+  if (!Decl)
     emitError(Id, "use of undeclared identifier '" + Id->getName() + "'");
-  Declaration *Decl = It->second;
   Id->setDeclaration(Decl);
-  Id->setType(Decl->getInitializer()->getType());
+  Id->setType(Decl->getType());
 }
 
 void Sema::run(ASTNode *TU) {
+  Scopes.emplace_back();
   auto Statements = llvm::cast<NodeList>(TU)->getNodes();
   for (auto S : Statements)
     S->sema(*this);
+  Scopes.pop_back();
+  assert(Scopes.empty() && "bug in scope processing");
+
+  for (auto &&[Decl, Instances] : FunctionInstances)
+    for (auto &&I : Instances)
+      llvm::cast<NodeList>(TU)->append(I.release());
 }

@@ -70,9 +70,9 @@ statement
 
 
 declaration
-    : let identifier '=' expression ';' { $$ = new Declaration($2, $4, /*IsRef=*/ false); free($2); }
-    | let '&' identifier '=' expression ';' { $$ = new Declaration($3, $5, /*IsRef=*/ true); free($3); }
-    | let identifier '(' optional-function-parameter-list ')' '=' expression ';' { $$ = new FunctionDeclaration($2, $4, $7); free($2); }
+    : let identifier '=' expression ';' { $$ = new VariableDecl($2, $4, /*IsRef=*/ false); free($2); }
+    | let '&' identifier '=' expression ';' { $$ = new VariableDecl($3, $5, /*IsRef=*/ true); free($3); }
+    | let identifier '(' optional-function-parameter-list ')' '=' expression ';' { $$ = new FunctionDecl($2, $4, $7); free($2); }
 
 optional-function-parameter-list
     : function-parameter-list
@@ -83,8 +83,8 @@ function-parameter-list
     | function-parameter { $$ = new NodeList($1); }
 
 function-parameter
-    : identifier { $$ = new Declaration($1, /*IsRef=*/ false); free($1); }
-    | '&' identifier { $$ = new Declaration($2, /*IsRef=*/ true); free($2); }
+    : identifier { $$ = new FuncParamDecl($1, /*IsRef=*/ false); free($1); }
+    | '&' identifier { $$ = new FuncParamDecl($2, /*IsRef=*/ true); free($2); }
 
 
 expression

@@ -81,17 +81,6 @@ void Identifier::print(llvm::raw_ostream &Os, unsigned Shift) const {
 
 Identifier *Identifier::clone() const { return new Identifier(Name); }
 
-void Declaration::print(llvm::raw_ostream &Os, unsigned Shift) const {
-  Os << tabulate(Shift) << "Declaration " << ((IsRef) ? "& " : "") << "'"
-     << Identifier << "'\n";
-  if (Initializer)
-    Initializer->print(Os, Shift + 1);
-}
-
-Declaration *Declaration::clone() const {
-  return new Declaration(Identifier, Initializer->clone(), IsRef);
-}
-
 void NodeList::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "NodeList\n";
   llvm::for_each(Nodes, [&Os, Shift](auto &&N) { N->print(Os, Shift + 1); });
@@ -104,14 +93,35 @@ NodeList *NodeList::clone() const {
   return List;
 }
 
-void FunctionDeclaration::print(llvm::raw_ostream &Os, unsigned Shift) const {
-  Os << tabulate(Shift) << "FunctionDeclaration '" << Identifier << "'\n";
-  Params->print(Os, Shift + 1);
-  Body->print(Os, Shift + 1);
+void VariableDecl::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "VariableDecl " << ((IsRef) ? "& " : "") << "'"
+     << getId() << "'\n";
+  if (getInitializer())
+    getInitializer()->print(Os, Shift + 1);
 }
 
-FunctionDeclaration *FunctionDeclaration::clone() const {
-  return new FunctionDeclaration(Identifier, Params->clone(), Body->clone());
+VariableDecl *VariableDecl::clone() const {
+  return new VariableDecl(getId(), getInitializer()->clone(), IsRef);
+}
+
+void FuncParamDecl::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "FuncParamDecl " << ((IsRef) ? "& " : "") << "'"
+     << getId() << "'\n";
+}
+
+FuncParamDecl *FuncParamDecl::clone() const {
+  return new FuncParamDecl(getId(), IsRef);
+}
+
+void FunctionDecl::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "FunctionDecl '" << getId() << "'\n";
+  Params->print(Os, Shift + 1);
+  getInitializer()->print(Os, Shift + 1);
+}
+
+FunctionDecl *FunctionDecl::clone() const {
+  return new FunctionDecl(getId(), Params->clone(),
+                                 getInitializer()->clone());
 }
 
 void FunctionCall::print(llvm::raw_ostream &Os, unsigned Shift) const {

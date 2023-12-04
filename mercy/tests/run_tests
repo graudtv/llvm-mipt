@@ -5,18 +5,20 @@ use warnings;
 use File::Basename;
 
 my $err_count = 0;
+my $prefix = "";
 
 sub test_case {
   my %args = @_;
   my $output = qx`echo '$args{source}' | ./mercy -S --emit-llvm | lli`;
   chomp $output;
   my $ok = ($output eq $args{expect});
-  printf "%-30s %s\n", $args{name}, ($ok ? "OK" : "FAIL");
+  printf "%-40s %s\n", "$prefix/$args{name}", ($ok ? "OK" : "FAIL");
   ++$err_count unless $ok;
 }
 
 my @tests = glob(dirname($0) . "/test_*");
 for my $test (@tests) {
+  $prefix = basename $test;
   do $test or die "failed to run tests";
 }
 

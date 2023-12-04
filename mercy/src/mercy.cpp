@@ -19,7 +19,10 @@ cl::opt<bool> OptEmitLLVM("emit-llvm",
     cl::desc("Emit llvm IR"),
     cl::cat(Options));
 cl::opt<bool> OptDumpAST("dump-ast",
-    cl::desc("Dump AST"),
+    cl::desc("Dump AST after parser, before semantic analysis"),
+    cl::cat(Options));
+cl::opt<bool> OptDumpASTSema("dump-ast-sema",
+    cl::desc("Dump AST after semantic analysis"),
     cl::cat(Options));
 cl::opt<std::string> OutputFilename("o",
     cl::desc("Output filename"),
@@ -48,23 +51,22 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  auto AST = parseFileOrStdin(InputFilename);
-
   std::unique_ptr<llvm::raw_fd_ostream> OutputFile;
   if (!OutputFilename.empty() && OutputFilename != "-")
     OutputFile = openFile(OutputFilename);
   llvm::raw_ostream &OS = OutputFile ? *OutputFile : llvm::outs();
 
-  if (OptDumpAST) {
-    AST->print(OS);
-    return 0;
-  }
+  auto AST = parseFileOrStdin(InputFilename);
+  if (OptDumpAST)
+    AST->print(llvm::errs());
+
   Sema S;
   S.run(AST.get());
+  if (OptDumpASTSema)
+    AST->print(llvm::errs());
 
   Codegen Gen;
-  Gen.run(std::move(AST));
-
+  Gen.run(AST.get());
   std::unique_ptr<llvm::Module> M = Gen.takeResult();
   if (OptS && OptEmitLLVM) {
     OS << *M;

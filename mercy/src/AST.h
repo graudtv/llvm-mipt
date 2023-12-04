@@ -31,9 +31,10 @@ public:
     NK_UnaryOperator,
     NK_Identifier,
     NK_FunctionCall,
-    NK_Declaration,
-    NK_FunctionDeclaration,
     NK_NodeList,
+    NK_VariableDecl,
+    NK_FuncParamDecl,
+    NK_FunctionDecl,
     NK_BuiltinTypeExpr
   };
 
@@ -173,38 +174,6 @@ public:
   }
 };
 
-/* Variable, type alias or function parameter declaration */
-class Declaration : public ASTNode {
-  std::string Identifier;
-  std::unique_ptr<Expression> Initializer;
-  bool IsRef;
-  llvm::Value *Alloca = nullptr;
-
-public:
-  Declaration(std::string Id, Expression *E, bool IsReference)
-      : ASTNode(NK_Declaration), Identifier(std::move(Id)), Initializer(E),
-        IsRef(IsReference) {}
-  Declaration(std::string Id, bool IsReference)
-      : Declaration(std::move(Id), nullptr, IsReference) {}
-
-  const std::string &getId() const { return Identifier; }
-  Expression *getInitializer() { return Initializer.get(); }
-  bool isRef() const { return IsRef; }
-
-  /* Set by Codegen */
-  void setAlloca(llvm::Value *A) { Alloca = A; }
-  llvm::Value *getAlloca() { return Alloca; }
-
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
-  llvm::Value *codegen(Codegen &Gen) override;
-  void sema(Sema &S) override;
-  Declaration *clone() const override;
-
-  static bool classof(const ASTNode *N) {
-    return N->getNodeKind() == NK_Declaration;
-  }
-};
-
 class NodeList : public ASTNode {
   std::vector<std::unique_ptr<ASTNode>> Nodes;
 
@@ -237,37 +206,122 @@ public:
   }
 };
 
-class FunctionDeclaration : public ASTNode {
-  std::string Identifier;
-  std::unique_ptr<NodeList> Params;
-  std::unique_ptr<Expression> Body;
+class Declaration : public ASTNode {
+  std::string Id;
+  std::unique_ptr<Expression> Init;
+  llvm::Value *Addr = nullptr;
 
 public:
-  FunctionDeclaration(std::string Id, NodeList *P, Expression *E)
-      : ASTNode(NK_FunctionDeclaration), Identifier(std::move(Id)), Params(P),
-        Body(E) {}
+  Declaration(NodeKind NK, std::string Identifier, Expression *Initializer)
+      : ASTNode(NK), Id(std::move(Identifier)), Init(Initializer) {}
 
-  const std::string &getId() const { return Identifier; }
-  Expression *getBody() { return Body.get(); }
+  const std::string &getId() const { return Id; }
+  void addIdPrefix(const std::string &Prefix) { Id = Prefix + Id; }
 
-  NodeList *getParamList() { return Params.get(); }
-  Declaration *getParam(size_t I) { return Params->getNodeAs<Declaration>(I); }
-  auto getParams() { return Params->getNodesAs<Declaration>(); }
-  size_t getParamCount() const { return Params->size(); }
+  Expression *getInitializer() { return Init.get(); }
+  const Expression *getInitializer() const { return Init.get(); }
+
+  /* May be used by Codegen */
+  void setAddr(llvm::Value *A) { Addr = A; }
+  llvm::Value *getAddr() { return Addr; }
+
+  virtual Type *getType() = 0;
+
+  static bool classof(const ASTNode *N) {
+    NodeKind NK = N->getNodeKind();
+    return NK == NK_VariableDecl || NK == NK_FuncParamDecl ||
+           NK == NK_FunctionDecl;
+  }
+};
+
+/* Variable or type alias declaration */
+class VariableDecl : public Declaration {
+  bool IsRef;
+
+public:
+  VariableDecl(std::string Id, Expression *E, bool IsReference)
+      : Declaration(NK_VariableDecl, std::move(Id), E), IsRef(IsReference) {}
+
+  bool isRef() const { return IsRef; }
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
-  FunctionDeclaration *clone() const override;
+  VariableDecl *clone() const override;
+  Type *getType() override { return getInitializer()->getType(); }
 
   static bool classof(const ASTNode *N) {
-    return N->getNodeKind() == NK_FunctionDeclaration;
+    return N->getNodeKind() == NK_VariableDecl;
+  }
+};
+
+class FuncParamDecl : public Declaration {
+  bool IsRef;
+  Type *ParamTy = nullptr;
+  llvm::Value *Addr = nullptr;
+
+public:
+  FuncParamDecl(std::string Id, bool IsReference)
+      : Declaration(NK_FuncParamDecl, std::move(Id), nullptr),
+        IsRef(IsReference) {}
+
+  bool isRef() const { return IsRef; }
+
+  /* Set by Sema when instantiating functions */
+  void setType(Type *T) { ParamTy = T; }
+  Type *getType() override { return ParamTy; }
+
+  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
+  FuncParamDecl *clone() const override;
+
+  static bool classof(const ASTNode *N) {
+    return N->getNodeKind() == NK_FuncParamDecl;
+  }
+};
+
+class FunctionDecl : public Declaration {
+  std::unique_ptr<NodeList> Params;
+
+public:
+  FunctionDecl(std::string Id, NodeList *P, Expression *E)
+      : Declaration(NK_FunctionDecl, std::move(Id), E), Params(P) {}
+
+  NodeList *getParamList() { return Params.get(); }
+  FuncParamDecl *getParam(size_t I) {
+    return Params->getNodeAs<FuncParamDecl>(I);
+  }
+  FuncParamDecl *getParam(size_t I) const {
+    return Params->getNodeAs<FuncParamDecl>(I);
+  }
+  auto getParams() { return Params->getNodesAs<FuncParamDecl>(); }
+  size_t getParamCount() const { return Params->size(); }
+
+  auto getParamTypes() {
+    return llvm::map_range(getParams(),
+                           [](FuncParamDecl *Decl) { return Decl->getType(); });
+  }
+
+  bool isExtern() const { return !getInitializer(); }
+  bool isInstance() const { return !getParamCount() || getParam(0)->getType(); }
+  bool isTemplate() { return !isExtern() && !isInstance(); }
+
+  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
+  FunctionDecl *clone() const override;
+  Type *getType() override { assert(0 && "not implemented"); }
+
+  static bool classof(const ASTNode *N) {
+    return N->getNodeKind() == NK_FunctionDecl;
   }
 };
 
 class FunctionCall : public Expression {
   std::unique_ptr<ASTNode> Callee;
   std::unique_ptr<NodeList> Args;
+  FunctionDecl *CalleeDecl;
 
 public:
   FunctionCall(ASTNode *C, NodeList *ArgList)
@@ -282,6 +336,10 @@ public:
   Expression *getArg(size_t I) { return Args->getNodeAs<Expression>(I); }
   auto getArgs() { return Args->getNodesAs<Expression>(); }
   size_t getArgCount() const { return Args->size(); }
+
+  /* Set by Sema */
+  void setCalleeDecl(FunctionDecl *Decl) { CalleeDecl = Decl; }
+  FunctionDecl *getCalleeDecl() { return CalleeDecl; }
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;

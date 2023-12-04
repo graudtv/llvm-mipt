@@ -16,16 +16,20 @@ class Codegen {
                                             const char *Fmt);
   llvm::FunctionCallee getOrInsertPrintFunc(BuiltinType *Ty);
 
+  llvm::FunctionCallee getOrInsertFuncDecl(FunctionDecl *FD);
+
 public:
   Codegen();
   llvm::Value *emitIntegralLiteral(IntegralLiteral *IL);
   llvm::Value *emitBinaryOperator(BinaryOperator *BinOp);
   llvm::Value *emitUnaryOperator(UnaryOperator *Op);
   llvm::Value *emitFunctionCall(FunctionCall *FC);
-  llvm::Value *emitDeclaration(Declaration *Decl);
+  llvm::Value *emitVariableDecl(VariableDecl *Decl);
+  llvm::Value *emitFuncParamDecl(FuncParamDecl *Decl);
+  llvm::Value *emitFunctionDecl(FunctionDecl *Decl);
   llvm::Value *emitIdentifier(Identifier *Id);
 
-  void run(std::unique_ptr<ASTNode> AST);
+  void run(ASTNode *AST);
 
   /* Note that Module is binded to LLVMContext, i.e. Codegen must be alive
    * while returned module is used */
