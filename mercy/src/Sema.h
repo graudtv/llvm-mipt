@@ -6,14 +6,29 @@
 
 namespace mercy {
 
-class Sema {
-  using Scope = std::unordered_map<std::string, Declaration *>;
-  using InstanceList = std::vector<std::unique_ptr<TemplateInstance>>;
+class Scope {
+  std::unordered_map<std::string, Declaration *> Decls;
 
+public:
+  Declaration *find(const std::string &Id) {
+    if (auto It = Decls.find(Id); It != Decls.end())
+      return It->second;
+    return nullptr;
+  }
+
+  void insert(Declaration *Decl) {
+    Decls.insert(std::make_pair(Decl->getId(), Decl));
+  }
+};
+
+class Sema {
   std::vector<Scope> Scopes;
+  using InstanceList = std::vector<TemplateInstance *>;
   std::unordered_map<FunctionDecl *, InstanceList> FunctionInstances;
 
-  /* Supplementary list which keeps track of all instantiations */
+  /* Storage for all emitted function declarations */
+  std::vector<std::unique_ptr<FunctionDecl>> FunctionDecls;
+  /* Storage for all emitted function instantiations */
   std::vector<TemplateInstance *> AllInstances;
 
   Declaration *findDecl(const std::string &Id);
@@ -30,7 +45,7 @@ public:
   void actOnUnaryOperator(UnaryOperator *Op);
   void actOnFunctionCall(FunctionCall *FC);
   void actOnVariableDecl(VariableDecl *Decl);
-  void actOnFunctionDecl(FunctionDecl *Decl);
+  void actOnFunctionFragment(FunctionFragment *Fragment);
   void actOnFuncParamDecl(FuncParamDecl *Decl);
   void actOnIdentifier(Identifier *Id);
 

@@ -123,15 +123,28 @@ FuncParamDecl *FuncParamDecl::clone() const {
   return new FuncParamDecl(getId(), IsRef);
 }
 
+void FunctionFragment::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "FunctionFragment '" << getId() << "'\n";
+  Params->print(Os, Shift + 1);
+  Body->print(Os, Shift + 1);
+}
+
+FunctionFragment *FunctionFragment::clone() const {
+  return new FunctionFragment(getId(), Params->clone(), Body->clone(),
+                              WhenExpr ? WhenExpr->clone() : nullptr);
+}
+
 void FunctionDecl::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "FunctionDecl '" << getId() << "'\n";
-  Params->print(Os, Shift + 1);
-  getInitializer()->print(Os, Shift + 1);
+  llvm::for_each(Fragments,
+                 [&Os, Shift](auto &&F) { F->print(Os, Shift + 1); });
 }
 
 FunctionDecl *FunctionDecl::clone() const {
-  return new FunctionDecl(getId(), Params->clone(), getInitializer()->clone(),
-                          WhenExpr ? WhenExpr->clone() : nullptr);
+  FunctionDecl *Decl = new FunctionDecl(Fragments.front()->clone());
+  std::for_each(std::next(Fragments.begin()), Fragments.end(),
+                [Decl](auto &&F) { Decl->appendFragment(F->clone()); });
+  return Decl;
 }
 
 void FunctionCall::print(llvm::raw_ostream &Os, unsigned Shift) const {

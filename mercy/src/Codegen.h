@@ -18,7 +18,8 @@ class Codegen {
                                             const char *Fmt);
   llvm::FunctionCallee getOrInsertPrintFunc(BuiltinType *Ty);
 
-  llvm::FunctionCallee insertInstanceDecl(TemplateInstance *Instance);
+  llvm::FunctionCallee getOrInsertFunction(CallableFunction *F);
+  llvm::FunctionCallee getOrInsertInstanceDecl(TemplateInstance *Instance);
 
 public:
   Codegen();

@@ -26,10 +26,11 @@ VISIT_NODE(VariableDecl)
 VISIT_NODE(Identifier)
 
 SKIP_NODE(BuiltinTypeExpr)
-SKIP_NODE(FunctionDecl)
+SKIP_NODE(FunctionFragment)
 
 UNREACHABLE_NODE(NodeList)
 UNREACHABLE_NODE(FuncParamDecl)
+UNREACHABLE_NODE(FunctionDecl)
 
 namespace {
 
@@ -81,15 +82,25 @@ llvm::FunctionCallee Codegen::getOrInsertPrintFunc(BuiltinType *Ty) {
   llvm_unreachable("unhandled builtin type");
 }
 
-llvm::FunctionCallee Codegen::insertInstanceDecl(TemplateInstance *Instance) {
+llvm::FunctionCallee Codegen::getOrInsertFunction(CallableFunction *F) {
+  if (auto *I = llvm::dyn_cast<TemplateInstance>(F))
+    return getOrInsertInstanceDecl(I);
+  assert(0 && "extern not implemented");
+}
+
+llvm::FunctionCallee Codegen::getOrInsertInstanceDecl(TemplateInstance *Instance) {
+  if (llvm::Function *F = M->getFunction(Instance->getId()))
+    return F;
+
   // TODO: Handle non-builtin return types
-  assert(llvm::isa<BuiltinType>(Instance->getReturnType()));
-  BuiltinType *RetTy = llvm::cast<BuiltinType>(Instance->getReturnType());
+  FunctionDecl *FD = Instance->getDecl();
+  assert(llvm::isa<BuiltinType>(FD->getReturnType()));
+  BuiltinType *RetTy = llvm::cast<BuiltinType>(FD->getReturnType());
 
   // TODO: Handle non-builtin parameter types
   std::vector<llvm::Type *> ParamTys;
   llvm::transform(
-      Instance->getParamTypes(), std::back_inserter(ParamTys),
+      FD->getParamTypes(), std::back_inserter(ParamTys),
       [this](Type *T) { return llvm::cast<BuiltinType>(T)->getLLVMType(Ctx); });
   llvm::FunctionType *FuncTy =
       llvm::FunctionType::get(RetTy->getLLVMType(Ctx), ParamTys, false);
@@ -206,8 +217,7 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
       emitError(Callee, "cannot print argument of non-builtin type");
     }
   }
-  return Builder.CreateCall(M->getFunction(FC->getCalleeFunc()->getId()),
-                            Arguments);
+  return Builder.CreateCall(getOrInsertFunction(FC->getCalleeFunc()), Arguments);
 }
 
 llvm::Value *Codegen::emitVariableDecl(VariableDecl *Decl) {
@@ -224,15 +234,17 @@ llvm::Value *Codegen::emitVariableDecl(VariableDecl *Decl) {
 }
 
 void Codegen::emitTemplateInstance(TemplateInstance *Instance) {
+  FunctionDecl *FD = Instance->getDecl();
+  FunctionFragment *FrontFragment = FD->getFragment(0);
+
   llvm::Function *Func =
-      llvm::cast<llvm::Function>(insertInstanceDecl(Instance).getCallee());
+      llvm::cast<llvm::Function>(getOrInsertInstanceDecl(Instance).getCallee());
   llvm::BasicBlock *EntryBB = llvm::BasicBlock::Create(Ctx, "", Func);
-  FunctionDecl *FrontDomain = Instance->getDomain(0);
   Builder.SetInsertPoint(EntryBB);
 
   /* Create alloca for each function parameter */
-  for (size_t I = 0; I < FrontDomain->getParamCount(); ++I) {
-    FuncParamDecl *Param = FrontDomain->getParam(I);
+  for (size_t I = 0; I < FrontFragment->getParamCount(); ++I) {
+    FuncParamDecl *Param = FrontFragment->getParam(I);
     Func->getArg(I)->setName(Param->getId());
     assert(llvm::isa<BuiltinType>(Param->getType()) &&
            "only builtin types implemented");
@@ -242,13 +254,13 @@ void Codegen::emitTemplateInstance(TemplateInstance *Instance) {
     Builder.CreateStore(Func->getArg(I), Param->getAddr());
   }
   /* Handle each domain */
-  for (FunctionDecl *Domain : Instance->getDomains()) {
+  for (FunctionFragment *Fragment : FD->getFragments()) {
     llvm::BasicBlock *NextBB = nullptr;
     /* Bind parameters to addresses */
-    for (size_t I = 0; I < FrontDomain->getParamCount(); ++I)
-      Domain->getParam(I)->setAddr(FrontDomain->getParam(I)->getAddr());
+    for (size_t I = 0; I < FrontFragment->getParamCount(); ++I)
+      Fragment->getParam(I)->setAddr(FrontFragment->getParam(I)->getAddr());
     /* Emit WhenExpr if exists */
-    if (Expression *WhenExpr = Domain->getWhenExpr()) {
+    if (Expression *WhenExpr = Fragment->getWhenExpr()) {
       llvm::Value *Cond = WhenExpr->codegen(*this);
       llvm::BasicBlock *TrueBB = llvm::BasicBlock::Create(Ctx, "domain", Func);
       NextBB = llvm::BasicBlock::Create(Ctx, "next", Func);
@@ -256,13 +268,13 @@ void Codegen::emitTemplateInstance(TemplateInstance *Instance) {
       Builder.SetInsertPoint(TrueBB);
     }
     /* Generate function body */
-    Builder.CreateRet(Domain->getInitializer()->codegen(*this));
+    Builder.CreateRet(Fragment->getBody()->codegen(*this));
     /* Move to the next domain */
     if (NextBB)
       Builder.SetInsertPoint(NextBB);
   }
-  /* Emit domain error */
-  if (Instance->getDomainCount() > 1 || Instance->getDomain(0)->getWhenExpr()) {
+  /* Runtime 'domain error' emission */
+  if (FD->getFragmentCount() > 1 || FrontFragment->getWhenExpr()) {
     llvm::FunctionCallee Puts = M->getOrInsertFunction(
         "puts", Builder.getInt32Ty(), Builder.getInt8Ty()->getPointerTo());
     llvm::FunctionCallee Exit = M->getOrInsertFunction(
@@ -271,9 +283,9 @@ void Codegen::emitTemplateInstance(TemplateInstance *Instance) {
                                  "Error: domain error in function '" +
                                  Instance->getId() + "'"));
     Builder.CreateCall(Exit, Builder.getInt32(1));
-    assert(llvm::isa<BuiltinType>(Instance->getReturnType()) &&
+    assert(llvm::isa<BuiltinType>(FD->getReturnType()) &&
            "only builtin types implemented");
-    BuiltinType *RetTy = llvm::cast<BuiltinType>(Instance->getReturnType());
+    BuiltinType *RetTy = llvm::cast<BuiltinType>(FD->getReturnType());
     Builder.CreateRet(llvm::PoisonValue::get(RetTy->getLLVMType(Ctx)));
   }
 }
@@ -303,6 +315,6 @@ void Codegen::run(ASTNode *AST, Sema &S) {
     S->codegen(*this);
   Builder.CreateRet(Builder.getInt32(0));
   for (auto S : Statements)
-    if (llvm::isa<FunctionDecl>(S))
+    if (llvm::isa<FunctionFragment>(S))
       S->codegen(*this);
 }

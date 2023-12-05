@@ -88,8 +88,8 @@ statement
 declaration
     : let identifier '=' expression ';' { $$ = new VariableDecl($2, $4, /*IsRef=*/ false); free($2); }
     | let '&' identifier '=' expression ';' { $$ = new VariableDecl($3, $5, /*IsRef=*/ true); free($3); }
-    | let identifier '(' optional-function-parameter-list ')' '=' expression ';' { $$ = new FunctionDecl($2, $4, $7); free($2); }
-    | let identifier '(' optional-function-parameter-list ')' '=' expression when expression ';' { $$ = new FunctionDecl($2, $4, $7, $9); free($2); }
+    | let identifier '(' optional-function-parameter-list ')' '=' expression ';' { $$ = new FunctionFragment($2, $4, $7); free($2); }
+    | let identifier '(' optional-function-parameter-list ')' '=' expression when expression ';' { $$ = new FunctionFragment($2, $4, $7, $9); free($2); }
 
 optional-function-parameter-list
     : function-parameter-list

@@ -19,7 +19,7 @@ VISIT_NODE(BinaryOperator)
 VISIT_NODE(UnaryOperator)
 VISIT_NODE(FunctionCall)
 VISIT_NODE(VariableDecl)
-VISIT_NODE(FunctionDecl)
+VISIT_NODE(FunctionFragment)
 VISIT_NODE(FuncParamDecl)
 VISIT_NODE(Identifier)
 
@@ -27,6 +27,7 @@ SKIP_NODE(IntegralLiteral)
 
 UNREACHABLE_NODE(BuiltinTypeExpr)
 UNREACHABLE_NODE(NodeList)
+UNREACHABLE_NODE(FunctionDecl)
 
 namespace {
 void emitError(ASTNode *Node, const llvm::Twine &T) {
@@ -35,18 +36,19 @@ void emitError(ASTNode *Node, const llvm::Twine &T) {
 }
 } // namespace
 
+/* Search for declaration in all enclosing scopes */
 Declaration *Sema::findDecl(const std::string &Id) {
   for (auto ScopeIt = Scopes.rbegin(); ScopeIt != Scopes.rend(); ++ScopeIt)
-    if (auto DeclIt = ScopeIt->find(Id); DeclIt != ScopeIt->end())
-      return DeclIt->second;
+    if (Declaration *Decl = ScopeIt->find(Id))
+      return Decl;
   return nullptr;
 }
 
 void Sema::insertDecl(Declaration *Decl) {
   Scope &CurScope = Scopes.back();
-  if (auto It = CurScope.find(Decl->getId()); It != CurScope.end())
+  if (Declaration *PrevDecl = CurScope.find(Decl->getId()))
     emitError(Decl, "redefinition of '" + Decl->getId() + "'");
-  CurScope.insert(std::make_pair(Decl->getId(), Decl));
+  CurScope.insert(Decl);
 }
 
 TemplateInstance *
@@ -54,38 +56,39 @@ Sema::getOrCreateFunctionInstance(FunctionDecl *FD,
                                   llvm::ArrayRef<Type *> ParamTys) {
   InstanceList &Instances = FunctionInstances[FD];
   auto It = llvm::find_if(Instances, [ParamTys](auto &&I) {
-    return llvm::equal(I->getParamTypes(), ParamTys);
+    return llvm::equal(I->getDecl()->getParamTypes(), ParamTys);
   });
   if (It != Instances.end())
-    return It->get();
+    return *It;
 
   /* Instantiate function */
   unsigned InstanceId = Instances.size();
-  FunctionDecl *Domain = FD->clone();
-  TemplateInstance *Instance = new TemplateInstance(Domain);
-  Instances.emplace_back(Instance);
+  TemplateInstance *Instance = new TemplateInstance(FD->clone());
+  Instances.push_back(Instance);
+  AllInstances.emplace_back(Instance);
 
   Instance->setIdPrefix("__" + std::to_string(InstanceId) + "_");
-  for (size_t I = 0; I < ParamTys.size(); ++I)
-    Domain->getParam(I)->setType(ParamTys[I]);
+  for (FunctionFragment *Fragment : Instance->getDecl()->getFragments()) {
+    for (size_t I = 0; I < ParamTys.size(); ++I)
+      Fragment->getParam(I)->setType(ParamTys[I]);
 
-  // TODO: variables handled in the wrong scope here
-  pushScope();
-  llvm::for_each(Domain->getParams(),
-                 [this](FuncParamDecl *D) { D->sema(*this); });
-  if (Expression *WhenExpr = Domain->getWhenExpr())
-    WhenExpr->sema(*this);
-  Domain->getInitializer()->sema(*this);
-  if (Domain->getInitializer()->getType() != Instance->getReturnType()) {
-    emitError(
-        FD,
-        "function returns values of different types in different domains: '" +
-            Domain->getInitializer()->getType()->toString() +
-            "' vs previously used type '" +
-            Instance->getReturnType()->toString());
+    // TODO: variables handled in the wrong scope here
+    pushScope();
+    llvm::for_each(Fragment->getParams(),
+                   [this](FuncParamDecl *D) { D->sema(*this); });
+    if (Expression *WhenExpr = Fragment->getWhenExpr())
+      WhenExpr->sema(*this);
+    Fragment->getBody()->sema(*this);
+    if (Fragment->getReturnType() != Instance->getDecl()->getReturnType()) {
+      emitError(
+          FD,
+          "function returns values of different types in different domains: '" +
+              Fragment->getReturnType()->toString() +
+              "' vs previously used type '" +
+              Instance->getDecl()->getReturnType()->toString());
+    }
+    popScope();
   }
-  popScope();
-  AllInstances.push_back(Instance);
   return Instance;
 }
 
@@ -172,11 +175,12 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
     Declaration *Decl = findDecl(Id->getName());
     if (!Decl)
       emitError(Callee, "call to undeclared function '" + Id->getName() + "'");
-    assert(llvm::isa<FunctionDecl>(Decl) && "reference calls not implemented");
+    assert(llvm::isa<FunctionDecl>(Decl) &&
+           "reference calls not implemented");
     FunctionDecl *FD = llvm::cast<FunctionDecl>(Decl);
     TemplateInstance *Instance = getOrCreateFunctionInstance(FD, ArgTys);
     FC->setCalleeFunc(Instance);
-    FC->setType(Instance->getReturnType());
+    FC->setType(Instance->getDecl()->getReturnType());
     return;
   };
   assert(0 && "not implemented: cannot handle call");
@@ -188,7 +192,23 @@ void Sema::actOnVariableDecl(VariableDecl *Decl) {
   Decl->getInitializer()->sema(*this);
 }
 
-void Sema::actOnFunctionDecl(FunctionDecl *Decl) { insertDecl(Decl); }
+void Sema::actOnFunctionFragment(FunctionFragment *Fragment) {
+  Scope &CurScope = Scopes.back();
+  if (Declaration *PrevDecl = CurScope.find(Fragment->getId())) {
+    /* Function already defined on some domain, add another domain */
+    if (FunctionDecl *Decl = llvm::dyn_cast<FunctionDecl>(PrevDecl)) {
+      Decl->appendFragment(Fragment->clone());
+      return;
+    }
+    emitError(Fragment, "redefinition of '" + Fragment->getId() + "'");
+    // TODO: print location of previous definition and its type
+  }
+  /* First definition of the function, create new FunctionDecl */
+  auto Decl = std::make_unique<FunctionDecl>(Fragment->clone());
+  CurScope.insert(Decl.get());
+  FunctionDecls.push_back(std::move(Decl));
+}
+
 void Sema::actOnFuncParamDecl(FuncParamDecl *Decl) { insertDecl(Decl); }
 
 /* Lookup declaration and set type of identifier */

@@ -37,6 +37,7 @@ public:
     NK_NodeList,
     NK_VariableDecl,
     NK_FuncParamDecl,
+    NK_FunctionFragment,
     NK_FunctionDecl,
     NK_BuiltinTypeExpr,
 
@@ -221,17 +222,13 @@ public:
 
 class Declaration : public ASTNode {
   std::string Id;
-  std::unique_ptr<Expression> Init;
   llvm::Value *Addr = nullptr;
 
 public:
-  Declaration(NodeKind NK, std::string Identifier, Expression *Initializer)
-      : ASTNode(NK), Id(std::move(Identifier)), Init(Initializer) {}
+  Declaration(NodeKind NK, std::string Identifier)
+      : ASTNode(NK), Id(std::move(Identifier)) {}
 
   const std::string &getId() const { return Id; }
-
-  Expression *getInitializer() { return Init.get(); }
-  const Expression *getInitializer() const { return Init.get(); }
 
   /* May be used by Codegen */
   void setAddr(llvm::Value *A) { Addr = A; }
@@ -248,13 +245,18 @@ public:
 
 /* Variable or type alias declaration */
 class VariableDecl : public Declaration {
+  std::unique_ptr<Expression> Init;
   bool IsRef;
 
 public:
-  VariableDecl(std::string Id, Expression *E, bool IsReference)
-      : Declaration(NK_VariableDecl, std::move(Id), E), IsRef(IsReference) {}
+  VariableDecl(std::string Id, Expression *Initializer, bool IsReference)
+      : Declaration(NK_VariableDecl, std::move(Id)), Init(Initializer),
+        IsRef(IsReference) {}
 
   bool isRef() const { return IsRef; }
+
+  Expression *getInitializer() { return Init.get(); }
+  const Expression *getInitializer() const { return Init.get(); }
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
@@ -274,8 +276,7 @@ class FuncParamDecl : public Declaration {
 
 public:
   FuncParamDecl(std::string Id, bool IsReference)
-      : Declaration(NK_FuncParamDecl, std::move(Id), nullptr),
-        IsRef(IsReference) {}
+      : Declaration(NK_FuncParamDecl, std::move(Id)), IsRef(IsReference) {}
 
   bool isRef() const { return IsRef; }
 
@@ -293,15 +294,18 @@ public:
   }
 };
 
-class FunctionDecl : public Declaration {
+/* Definition of function on certain domain (possibly global domain) */
+class FunctionFragment : public ASTNode {
+  std::string Id;
   std::unique_ptr<NodeList> Params;
+  std::unique_ptr<Expression> Body;
   std::unique_ptr<Expression> WhenExpr;
 
 public:
-  FunctionDecl(std::string Id, NodeList *ParamList, Expression *Init,
-               Expression *When = nullptr)
-      : Declaration(NK_FunctionDecl, std::move(Id), Init), Params(ParamList),
-        WhenExpr(When) {}
+  FunctionFragment(std::string Id, NodeList *ParamList, Expression *B,
+                   Expression *When = nullptr)
+      : ASTNode(NK_FunctionFragment), Id(std::move(Id)), Params(ParamList),
+        Body(B), WhenExpr(When) {}
 
   NodeList *getParamList() { return Params.get(); }
   FuncParamDecl *getParam(size_t I) {
@@ -312,7 +316,11 @@ public:
   }
   auto getParams() { return Params->getNodesAs<FuncParamDecl>(); }
   size_t getParamCount() const { return Params->size(); }
+
+  const std::string &getId() const { return Id; }
+  Expression *getBody() const { return Body.get(); }
   Expression *getWhenExpr() const { return WhenExpr.get(); }
+  Type *getReturnType() { return Body->getType(); }
 
   auto getParamTypes() {
     return llvm::map_range(getParams(),
@@ -320,6 +328,39 @@ public:
   }
 
   bool isPureTemplate() { return getParamCount(); }
+
+  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
+  FunctionFragment *clone() const override;
+
+  static bool classof(const ASTNode *N) {
+    return N->getNodeKind() == NK_FunctionFragment;
+  }
+};
+
+/* Complete definition of a function, including all FunctionFragment-s.
+ * Built during Sema
+ */
+class FunctionDecl : public Declaration {
+  std::vector<std::unique_ptr<FunctionFragment>> Fragments;
+
+public:
+  FunctionDecl(FunctionFragment *F)
+      : Declaration(NK_FunctionDecl, F->getId()) {
+    appendFragment(F);
+  }
+  void appendFragment(FunctionFragment *Decl) { Fragments.emplace_back(Decl); }
+  auto getFragments() {
+    return llvm::map_range(Fragments, [](auto &&D) { return D.get(); });
+  }
+  FunctionFragment *getFragment(size_t Idx) { return Fragments[Idx].get(); }
+  size_t getFragmentCount() const { return Fragments.size(); }
+  bool isMultiFragment() const { return Fragments.size() > 1; }
+
+  /* Definitions on all domains must have the same parameter and return types */
+  Type *getReturnType() { return Fragments.front()->getReturnType(); }
+  auto getParamTypes() { return Fragments.front()->getParamTypes(); }
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
@@ -404,30 +445,19 @@ public:
   llvm::Function *getCallee() { return Callee; }
 };
 
-/* Instance of potentially template, potentially multi-domain function.
+/* Instance of potentially template FunctionDecl
  * Created by Sema, ready for Codegen */
 class TemplateInstance : public CallableFunction {
-  std::vector<std::unique_ptr<FunctionDecl>> Domains;
+  std::unique_ptr<FunctionDecl> Decl;
   std::string MangledId;
 
 public:
-  TemplateInstance(FunctionDecl *Domain)
-      : CallableFunction(CF_TemplateInstance), MangledId(Domain->getId()) {
-    appendDomain(Domain);
-  }
-  void appendDomain(FunctionDecl *Decl) { Domains.emplace_back(Decl); }
-  auto getDomains() {
-    return llvm::map_range(Domains, [](auto &&D) { return D.get(); });
-  }
-  size_t getDomainCount() const { return Domains.size(); }
-  FunctionDecl *getDomain(size_t Idx) { return Domains[Idx].get(); }
-  bool isMultiDomain() const { return Domains.size() > 1; }
-  auto getParamTypes() { return Domains.front()->getParamTypes(); }
+  TemplateInstance(FunctionDecl *FD) :
+    CallableFunction(CF_TemplateInstance), Decl(FD), MangledId(Decl->getId()) {}
 
-  /* Definitions on all domains must have the same return type */
-  Type *getReturnType() { return Domains.front()->getInitializer()->getType(); }
+  FunctionDecl *getDecl() { return Decl.get(); }
 
-  // TODO: build mangled id based on parameter types
+  // TODO: mangle Id based on parameter types
   void setIdPrefix(const std::string &P) { MangledId = P + MangledId; }
   const std::string &getId() const override { return MangledId; }
 
