@@ -5,7 +5,7 @@ Main features:
 * Compiled, hence efficient
 * Imperative and functional paradigms
 * Generic code and metaprogramming support
-* External C functions can be invoked
+* Foreign language support (C/C++)
 * All these features are implemented within a harmonic concise grammar
 
 ### Table of contents
@@ -30,12 +30,11 @@ Main features:
     + [Control flow](#control-flow)
 
 ### Syntax and semantics overview
-As in C/C++, program consists of one or more source files in _Mercy_ language,
-refered to as _translation units_, which are compiled into object files
-independently from each other. To produce an executable, object files are
-passed to the regular linker together with object files coming from other
-programming languages. The entry point to the program is ```main()```
-function.
+Program consists of a source file in _Mercy_ language, refered to as
+_translation unit_, which can be compiled into an object file and then linked
+with object files or libraries coming from other programming languages.
+_translation_unit_ must define ```main()``` function, which is an entry
+point to the program. ```main()``` must return _void_ or _int_.
 
 ##### Translation Unit
 _translation-unit_ consists of zero or more _declaration_-s, which define
@@ -52,8 +51,8 @@ declaration-list
 ```
 
 ##### Declaration
-_declaration_ defines a variable, a function or a type alias. It can be used
-either at the top level or in a _block_expression_.
+_declaration_ defines a variable or a function or a type alias. It can be used
+either at the top level or inside of a function.
 Note that "declaration" and "definition" are synonims in _Mercy_.
 
 All declaration start with _let_ keyword:
@@ -65,26 +64,37 @@ let int_type = int32;            // type alias declaration
 
 Type of variable is deduced based on the type of initializer.
 
-Type of function is deduced based on the parameter count and the type of
-initializer, the latter defining the return type of the function.
-Each function is inherently a template function.
+Each function is inherently a template function. The type of the function is
+deduced only during instantiation. Types of parameters are deduced based on
+types of supplied arguments, and the return type is deduced based on type of
+its body.
 
-Expression of primitive type (see _Primitive vs non-primitive types_) is copied
-when assigned to another variable or passed to a function. Expression of
-non-primitive type is assigned or passed by reference (from compiler
-perspective - by pointer to the object)
+Function with multiple statements can be definied with use of curly brackets:
+```
+let distance(x1, x2, y1, y2) {
+  let dx = x2 - x1;
+  let dy = y2 - y1;
+  return sqrt(dx * dx + dy * dy);
+};
+```
+Within such syntax zero or more _return-statements_ can be used. If none used,
+return type of the function is void. Otherwise, all _return-statements_ must
+return the same type, which becomes the return type of the function.
 
-However, expression of primitive type can also be assigned or passed by
+Expression of trivial type (_void_ or integer) is copied when assigned to
+another variable or passed to a function. Expression of non-trivial type is
+assigned or passed by reference.
+
+However, expression of trivial type can also be assigned or passed by
 reference if this is requested explicitly using '&' symbol:
 ```
 let &y = x;
 let increment(&x) = x + 1;
-let swap(&x, &y) = { let tmp = x; x = y; y = tmp; }
+let swap(&x, &y) { let tmp = x; x = y; y = tmp; }
 ```
-'&' notation has no effect if assignee expression is of non-primitive type:
-expression is passed by reference, as it would be without '&'. This enables
-the ```swap()``` function above to work with both primitive and non-primitive
-types.
+'&' notation has no effect if assignee expression is of non-trivial type:
+expression is passed by reference, as it would be without '&'. This enables the
+```swap()``` function above to work with both trivial and non-trivial types.
 
 Function can be defined on a specific domain using _when_ keyword. Multiple
 definitions on non-intersecting domains are possible:
@@ -94,16 +104,24 @@ let fact(n) = fact(n - 1)         when n > 1;
 ```
 If domains in different declarations of the same function intersect, the
 program is ill-formed, no diagnostic required. If a function is called with
-arguments which are not part of any domain, a runtime error is emited and
-program terminates.
+arguments which are not part of any domain, "domain error" is emited at
+runtime and program terminates.
+
+The last definition of a function may use _otherwise_ keyword to handle
+arguments which does not belong to any of domains specified in previous
+definitions of this function:
+```
+let select(cond, x, y) = x        when cond;
+let select(cond, x, y) = y        otherwise;
+```
 
 _Grammar Synopsis_:
 ```
 declaration
-    : "let" identifier "=" generic-expression ";"
+    : "let" identifier "=" expression ";"
     | "let" "&" identifier "=" expression ";"
-    | "let" identifier "(" optional-function-parameter-list ")" "=" generic-expression ";"
-    | "let" identifier "(" optional-function-parameter-list ")" "=" generic-expression "when" expression ";"
+    | "let" identifier "(" optional-function-parameter-list ")" "=" expression optional-domain ";"
+    | "let" identifier "(" optional-function-parameter-list ")" "{" statement-list "}" optional-domain ";"
 optional-function-parameter-list
     : function-parameter-list
     | %empty
@@ -113,23 +131,102 @@ function-parameter-list
 function-parameter
     : identifier
     | "&" identifier
+statement-list
+    : statement-list statement
+    | statement
+statement
+    : declaration
+    | expression ";"
+    | return-statement
+return-statement
+    : "return" expression ";"
+optional-domain
+    : "when" expression
+    | otherwise
+    | %empty
+```
+
+##### Type system
+Integers, function references and arrays are refered to as _Value_-s. Each
+_Value_ is a member of some set in mathematical sence, which is refered to as
+_Type_. The _Type_ defines possible operations on _Value_-s in it and semantics
+of that operations.
+
+Examples of types (math-like notation):
+```
+int = { 0, -1, 1, -2, 2, -3, 3, ... }
+uint64 = { 0ul, 1ul, 2ul, 3ul, 4ul, ... }
+array of int = { [], [0, 1, 2] , [-10, 13, 48, 99], ... }
+function (int,int)->void = { /* all possible functions of this signature */ }
+```
+
+All _Type_-s are members of a single set called _Meta_:
+```
+Meta = { uint, uint64, array of int, function (int,int)->void, ... }
+```
+Basically, _Meta_ is the type of a _Type_. _Meta_ is a top-level entity,
+it has no type itself.
+
+Unlike C/C++, *Mercy* has unified grammar for operations on _Value_-s and
+_Type_-s. It provides great opportunities for metaprogramming, for example
+types can be passed to functions as arguments and much more. _Value_-s and
+_Type_-s together are called _Generic Value_-s. _Type_-s and _Meta_ together
+are called _Generic Type_.
+
+List of all _Type_-s:
+* void, bool, int8, int16, int32, int64, uint8, uint16, uint32, uint64, string
+* array of elements of type T for each _Generic Type_ T
+* function with N parameters of types T1, ..., TN and return value of type RT
+  for each N >=0 and for each combination of _Generic Type_-s T1, ..., TN, TR
+
+##### Builtin type
+List of builtin types:
+* void, bool, int8, int16, int32, int64, uint8, uint16, uint32, uint64, string
+* int, uint
+
+_int_ and _uint_ are aliases to some _intXX_ and _uintXX_ type. Other types are
+different.
+
+Note. _Mercy_ does not allow implicit conversions, so implicit conversion from
+_bool_ to _uint8_ is not possible. This can be achieved with explicit cast, if
+desired. However, since _int_ and _int32_ are the same type, no explicit cast
+required.
+
+Each builtin type has an associated keyword, e.g.:
+```
+let int_type = int32;
+let uint_type = uint32;
+```
+
+_Grammar Synopsis_:
+```
+builtin-type
+    : "void" | "bool"
+    | "int" | "int8" | "int16" | "int32" | "int64"
+    | "uint" | "uint8" | "uint16" | "uint32" | "uint64"
+    | "string"
 ```
 
 ##### Expression
-_expression_ is the result of some evaluation. There are 4 ways how an
-expression can be built:
-1. Use of variable, function/operator invokation
-2. _type-expression_
-3. _block-expression_
-4. _extern-expression_
+_expression_ is the result of some evaluation. The result is _Generic Value_
+(see [Type system](#type-system)), i.e. each expression has a type which is
+either _Type_ or _Meta_.
 
-The 1st option represents usual arithmetic operations and function calls.
-Syntax, semantics and precedence is the same as in C (though not all C
-operators are supported)
+The most trivial form of expression is use of some _Generic Value_:
+```
+let x = 10; // 10 is expression of type int
+let y = int32; // int32 is expression of type Meta
+let str = "Hello"; // "Hello" is expression of type string
+let z = x; // x is expression of type int
+```
+
+Other expression are built using function calls and operators. The syntax and
+meaning is the same as in C, however not all C operators are supported.
 
 | Operators    | Associativity |
 |--------------|---------------|
 | () []        | left to right |
+| !            | right to left |
 | * / %        | left to right |
 | + -          | left to right |
 | << >>        | left to right |
@@ -147,17 +244,27 @@ let x = a + b; // a + b is expression
 func(x, 2 + 2 * 2); // x, 2, 2 * 2, 2 + 2 * 2, func(x, 2 + 2 * 2) are expressions
 ```
 
-_identifier_ used in _expression_ is accessed by reference:
-```
-let x = 0;
-let inc_x() = { x = x + 1 };
-inc_x();
-print(x); // 1
-```
-
-Options 2-4 do not have equivalent in C/C++. See [type
-expression](#type-expression), [block expression](#block-expression) and
-[extern expression](#extern-expression) for details.
+Operators have the following restrictions and semantics:
+* Operands of '&&', '||', '!' must be _Value_-s of _bool_ type, result is also
+  _bool_
+* Operands of '<', '<=', '>', '>=' must be _Value_-s of the same integer type.
+  The result has _bool_ type. Depending on whether the type is signed or
+  unsigned, signed or unsigned comparison is performed
+* Operands of '==', '!=' must be _Value_-s of the same integer type. The
+  result has _bool_ type.
+* Operands of '&', '^', '|' must be _Value_-s of the same unsigned integer
+  type. The result has the same type as operands.
+* Operands of '*', '+', '-', '<<' must be _Value_-s of the same integer type.
+  The result has the same type.
+* Operands of '/', '%', '>>' must be _Value_-s of the same integer type. The
+  result has the same type. Depending on whether the type is signed or
+  unsigned, signed or unsigned operation is performed (signed division vs
+  signed division, signed remainder vs unsigned remainder, logical shift vs
+  arithmetic shift)
+* LHS operand of '()' must be either compile-time _Value_ of function type or
+  builtin _Type_. The latter performs a type cast, see [type-cast](#type-cast).
+* LHS Operand of '[]' must be _Value_ of some array type. Operand inside
+  brackets must be _Value_ of integer type.
 
 _Grammar Synopsis_:
 ```
@@ -212,134 +319,58 @@ postfix-expression
 primary-expression
     : identifier
     | numeric-literal
+    | string-literal
+    | builtin-type
     | "(" expression ")"
-    | type-expression
-    | block-expression
-    | extern-expression
 expression-list
     : expression-list "," expression
     | expression
 ```
 
-##### Type expression
-Unlike C/C++, *Mercy* has unified grammar for operations on types and normal
-values. It provides great opportunities for metaprogramming, for example types
-can be passed to functions as arguments and much more.
+##### Type casts
+Compile-time builtin _Type_ can be used as a function name to construct a type
+from another integer type, i.e. perform a type cast:
 
-_type-expression_ builds a type. Note that this is not the only way how type
-can occur in some expression: variables can be type aliases and functions can
-return types. However, each type is eventually built by a sequence of
-_type-expression_-s.
-
-_Grammar Synopsis_:
 ```
-type-expression
-    : builtin-type
-    | function-type-expression
-    | array-type-expression
-```
-
-##### Builtin type
-List of builtin types:
-* void
-* bool
-* int, int8, int16, int32, int64
-* uint, uint8, uint16, uint32, uint64
-* uintptr
-
-_int_ and _uint_ are aliases to some _intXX_ and _uintXX_ type. Other types are
-different.
-
-Note. _Mercy_ does not allow implicit conversions, so implicit conversion from
-_bool_ to _uint8_ is not possible. This can be achieved with explicit cast,
-if desired. However, since _int_ and _int32_ (or _int64_, depending on
-architecture) are the same type, no explicit cast required.
-
-uintptr is a special type which can be used to exchange opaque pointers
-with C code.
-
-Each builtin type has an associated keyword, e.g.:
-```
-let int_type = int32;
+let x = 10;              // x is int
+let y = int16(x);        // y is int16
 let uint_type = uint32;
+let z = uint_type(x);    // z is uint32
 ```
 
-_Grammar Synopsis_:
-```
-builtin-type
-    : "void" | "bool"
-    | "int" | "int8" | "int16" | "int32" | "int64"
-    | "uint" | "uint8" | "uint16" | "uint32" | "uint64"
-    | "uintptr"
-```
+From syntactic perspective, these are just regular function calls, so
+such syntax is already supported by _expression_ hierarchy. Only special
+semantic handling is required.
 
-##### Function type expression
-_function-type-expression_ specifies a function type, i.e. function signature.
-It starts with _function_type_ keyword, followed by the list of types in
-parentheses:
+### Builtin Functions
+Part of *Mercy* functionality is provided as builtin functions. Invokation and
+usage syntax is exactly the same as for user-defined functions. These
+functions are part of the language because it is not possible to implement
+them in user code or as part of the standard library using only the base means
+of the language. Instead, they actually provide such means to the user.
+
+##### _function_type()_ function
+_Synopsis_: ```let function_type(return_type, param_types...) = <function_type>;```
+
+_function-type()_ returns a function type:
 ```
 let func_type1 = function_type(void, int, int);
 let func_type2 = function_type(int32);
 ```
 The first argument is function return type, the latter zero or more arguments
-are function parameter types.
+are function parameter types. All arguments must be compile-time expressions.
+The result is compile-time expression.
 
-_Grammar Synopsis_:
-```
-function-type-expression
-    : "function_type" "(" expression-list ")"
-```
+##### _extern()_ function
+_Synopsis_: ```let extern(symbol_name, symbol_type) = <reference_to_symbol>;```
 
-##### Array type expression
-_array-type-expression_ specifies an array type:
-```
-let arr_t = array_type(int32);
-```
-
-_Grammar Synopsis_:
-```
-array-type-expression
-    : "array_type" "(" expression ")"
-```
-
-##### Block expression
-_block-expression_ is a list of zero or more _statement_-s enclosed into
-curly brackets. _block-expression_ is executed statement by statement and
-yields the result of the expression under the first encountered _return_
-during execution.  All _return_-s must return expressions of the same type. If
-there is no _return_, return type of the _block-expression_ is _void_.
-
-This is most useful in function declarations:
-```
-let dist(x1, x2, y1, y2) = {
-  let dx = x2 - x1;
-  let dy = y2 - y1;
-  return sqrt(dx * dx + dy * dy);
-};
-```
-
-_Grammar Synopsis_:
-```
-block-expression
-    : "{" "}"
-    | "{" statement-list "}"
-statement-list
-    : statement-list statement
-    | statement
-statement
-    : declaration
-    | expression ";"
-    | "return" expression ";"
-```
-
-##### Extern expression
 Symbols defined in other object files (including ones produced from code in
-another language) can be referenced with _extern-expression_. The first
-argument of _extern_ is the name of the symbol to be referenced, the second
-is the symbol type.
+another language) can be referenced with _extern()_ function. The first
+argument of _extern()_ is the name of the symbol to be referenced, the second
+is the symbol type. The return value is reference to the symbol.
+Both arguments must be compile-time expressions.
 
-Usually _extern-expression_ is assigned to a variable using _let_. However,
-it can also be used inside expressions directly.
+Usually result of _extern()_ is assigned to a variable using _let_.
 ```
 let print_hex = extern(_print_hex, function_type(void, int32));
 let var = extern(_var, int32);
@@ -357,38 +388,58 @@ the types specified in _extern expression_ as if a _when_ clause was used.
 If type specified in _extern expression_ does not match the actual type of
 the symbol, behaviour is undefined.
 
-_Grammar Synopsis_:
-```
-extern-expression
-    : "extern" "(" identifier "," expression ")"
-```
+##### _array()_ function
+_Synopsis_: ```let array(values...) = <array>;```
 
-##### Constructors
-Integer type can be used as a function name to construct a type from
-another integer type, i.e. perform a type cast:
+_array()_ creates an array of supplied values. All values must be
+_Generic Value_-s of the same type.
 
-```
-let x = 10;              // x is int
-let y = int16(x);        // y is int16
-let uint_type = uint32;
-let z = uint_type(x);    // z is uint32
-```
+##### _alloca()_ function
+_Synopsis: ```let alloca(type, size) = <array>;```
 
-Array type can be used to create an array of specific size:
-```
-let arr_t = array_type(int32);
-let arr = arr_t(16); // array of 16 elements
-```
+* When used in global scope, _alloca()_ creates a global array. _size_ must be
+  compile-time non-negative _Value_ of integer type. _type_ must be
+  a _Generic Type_.
+* When use inside function, _alloca()_ creates an array on stack. _size_ must
+  be non-negative _Value_ of integer type. _type_ must be a _Generic Type_.
 
-From syntactic perspective, these are just regular function calls, so
-such syntax is already supported by _expression_ hierarchy. Only special
-semantic handling is required.
+### Other semantical concepts
+##### Compile-time expressions
+Since *Mercy* is compiled statically typed language, some context may require
+_Value_ or _Type_ to be known at compile-time, i.e. to be _compile-time
+expression_.
+
+Expression is compile-time expression if one of the following conditions
+is satisfied:
+* Expression is string or numeric literal
+* Expression is builtin-type ("int", "uint", ...)
+* Expression is the result of call to builtin function _function_type()_
+
+This set may be extended in the future.
+
+##### ODR and scope
+Each declaration is visible only in certain part of the program, which is
+called the _scope_ of declaration.
+
+* Top-level declaration is called _global declaration_. It is visible for
+  all following global declarations and in each function (even if function
+  comes before that declaration). The latter allows global functions to call
+  each other
+* Function declaration opens a nested scope, in which its parameters and body
+  are evaluated. Each parameter and declaration in the body is visible
+  from the point of declaration until the end of function.
+
+Declaration is looked up from the innermost to the global scope. Declaration
+with the same name may occur on different layers of scope stack, but not in
+the same scope. An exception is declaration of the function on certain domain,
+because it is actually only a part of declaration; however parameter count and
+return type deduced during instantiation must be the same.
 
 ##### Memory management
 * Any global object is alive from the invokation of main() until the end of
   execution
-* Currently any non-global object is alive from the point of its
-  definition until the end of the enclosing function.
+* Any non-global object is alive from the point of its definition until the
+  end of the enclosing function.
 
 Compiler may use registers, stack or heap as storage on its own choice, as
 long as the requirements of *Mercy* standard are satisfied and no memory is
@@ -398,17 +449,17 @@ Note. The requirement on life time of non-global objects highly constrains
 usage of lambdas and work with memory in general. This issue will be addressed
 in the future.
 ```
-// OK, x is primitive and thus copied when returned
+// OK, x is trivial and thus copied when returned
 let foo() = { let x = 0; return x; };
 
 // UB: dangling reference. x is destroyed at the end of boo()
 let boo() = { let x = array_type(int32)(16); return x; };
 
-// OK, x is alive until end of bar()
+// OK, x is alive until the end of bar()
 let bar() {
   let x = 0;
   let f() = { print(x); };
-  return f();
+  f();
 };
 
 // UB: returned lambda has dangling reference to x
@@ -417,9 +468,7 @@ let moo() = {
   let f() = { print(x); };
   return f;
 };
-
 ```
-
 ### Full grammar
 ##### Lexer grammar
 Non-trivial terminals:
@@ -430,14 +479,16 @@ numeric-literal:
     [+-]?[1-9][0-9]*            ; decimal number
     0x[0-9]+                    ; hex number
     0[0-9]+                     ; octal number
+string-literal:
+    "*"
 ```
 
-Operators: ```* / % + - << >> < <= > >= == != & ^ | && ||```
+Operators: ```* / % + - << >> < <= > >= == != & ^ | && || !```
 
 Separators: ```( ) { } , ;```
 
 Keywords:
-* ```function_type```, ```extern```, ```return```
+* ```when```, ```otherwise```, ```return```
 * ```void```, ```bool```
 * ```int```, ```int8```, ```int16```, ```int32```, ```int64```
 * ```uint```, ```uint8```, ```uint16```, ```uint32```, ```uint64```
@@ -455,8 +506,8 @@ declaration-list
 declaration
     : "let" identifier "=" expression ";"
     | "let" "&" identifier "=" expression ";"
-    | "let" identifier "(" optional-function-parameter-list ")" "=" expression ";"
-    | "let" identifier "(" optional-function-parameter-list ")" "=" expression "when" expression ";"
+    | "let" identifier "(" optional-function-parameter-list ")" "=" expression optional-domain ";"
+    | "let" identifier "(" optional-function-parameter-list ")" "{" statement-list "}" optional-domain ";"
 optional-function-parameter-list
     : function-parameter-list
     | %empty
@@ -466,6 +517,19 @@ function-parameter-list
 function-parameter
     : identifier
     | "&" identifier
+statement-list
+    : statement-list statement
+    | statement
+statement
+    : declaration
+    | expression ";"
+    | return-statement
+return-statement
+    : "return" expression ";"
+optional-domain
+    : "when" expression
+    | otherwise
+    | %empty
 
 expression
     : logical-or-expression
@@ -518,67 +582,49 @@ postfix-expression
 primary-expression
     : identifier
     | numeric-literal
+    | string-literal
+    | builtin-type
     | "(" expression ")"
-    | type-expression
-    | block-expression
-    | extern-expression
 expression-list
     : expression-list "," expression
     | expression
 
-type-expression
-    : builtin-type
-    | function-type-expression
-    | array-type-expression
 builtin-type
     : "void" | "bool"
     | "int" | "int8" | "int16" | "int32" | "int64"
     | "uint" | "uint8" | "uint16" | "uint32" | "uint64"
-    | "uintptr"
-function-type-expression
-    : "function_type" "(" expression-list ")"
-array-type-expression
-    : "array_type" "(" expression ")"
-
-block-expression
-    : "{" "}"
-    | "{" statement-list "}"
-statement-list
-    : statement-list statement
-    | statement
-statement
-    : declaration
-    | expression ";"
-    | "return" expression ";"
-
-extern-expression
-    : "extern" "(" identifier "," expression ")"
 ```
 
 ### TODO
 Thoughts and ideas on future extensions.
 
-##### Strings
-Will be added soon.
+##### Operations on strings
+Basic string operations like '+', strlen, etc
 
 ##### Operations on types
-The point of expressions with types is too allow something like this:
+The point of _Generic Value_-s is to allow something like this:
 ```
-let sizeof(type) = type.size;
+let sizeof(type) = type.size();
 let sz = sizeof(int32); // sz = 4
 ```
 and this (template specialization, essentially):
 ```
-let foo(x) = smth() when (x is int32) || (x is int64);
+let any_signed_int = int8 | int16 | int32 | int64;
+let foo(x) = smth() when x is any_signed_int;
 let foo(x) = smth_else() when x is string;
 ```
+Requires significant extensions and sufficient constexpr evaluation support
 
 ##### Control flow
-Generally _when_ clause allows for writing anything using functional style:
+Generally _when_ clause allows for writing anything using functional-like
+style:
 ```
-let select(cond, x, y) = x        when cond;
-let select(cond, x, y) = y        when !cond;
+let maybe(cond, f) { f(); }         when cond;
+let maybe(cond, f) {}               otherwise;
 
-print(select(foo(), boo(), bar(goo())));
+let say_hello() = print("Hello, world!");
+let cond = (0 == 0);
+maybe(cond, say_hello);
+maybe(!cond, say_hello);
 ```
 However, _if_ + _for_ + _while_ should be useful.
