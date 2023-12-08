@@ -37,13 +37,11 @@ public:
     NK_NodeList,
     NK_VariableDecl,
     NK_FuncParamDecl,
+    NK_FunctionDomain,
     NK_FunctionFragment,
     NK_FunctionDecl,
     NK_BuiltinTypeExpr,
-
-    NK_CallableFunction,
-    NK_TemplateInstance,
-    NK_ExternFunction
+    NK_ReturnStmt
   };
 
 private:
@@ -188,6 +186,7 @@ public:
   }
 };
 
+/* Generic list of ASTNodes, used in multiple grammar rules */
 class NodeList : public ASTNode {
   std::vector<std::unique_ptr<ASTNode>> Nodes;
 
@@ -294,18 +293,44 @@ public:
   }
 };
 
-/* Definition of function on certain domain (possibly global domain) */
-class FunctionFragment : public ASTNode {
-  std::string Id;
-  std::unique_ptr<NodeList> Params;
-  std::unique_ptr<Expression> Body;
-  std::unique_ptr<Expression> WhenExpr;
+/* Specifies domain on which FunctionFragment is defined */
+class FunctionDomain : public ASTNode {
+private:
+  std::unique_ptr<Expression> Expr;
+  enum DomainKind { Global, Custom, Otherwise } DK;
 
 public:
-  FunctionFragment(std::string Id, NodeList *ParamList, Expression *B,
-                   Expression *When = nullptr)
+  FunctionDomain(Expression *E) : ASTNode(NK_FunctionDomain), Expr(E), DK(Custom) {}
+  FunctionDomain(bool IsGlobal) : ASTNode(NK_FunctionDomain), Expr(nullptr), DK(IsGlobal ? Global : Otherwise) {}
+  bool isGlobal() const { return DK == Global; }
+  bool isCustom() const { return DK == Custom; }
+  bool isOtherwise() const { return DK == Otherwise; }
+  Expression *getExpr() { assert(isCustom()); return Expr.get(); }
+
+  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
+  FunctionDomain *clone() const override;
+
+  static bool classof(const ASTNode *N) {
+    return N->getNodeKind() == NK_FunctionDomain;
+  }
+};
+
+/* Definition of function on certain domain (possibly global domain) */
+class FunctionFragment : public ASTNode {
+private:
+  std::string Id;
+  std::unique_ptr<NodeList> Params;
+  std::unique_ptr<NodeList> Body;
+  std::unique_ptr<FunctionDomain> Domain;
+  Type *RetTy = nullptr;
+
+public:
+  FunctionFragment(std::string Id, NodeList *ParamList, NodeList *B,
+                   FunctionDomain *Dom)
       : ASTNode(NK_FunctionFragment), Id(std::move(Id)), Params(ParamList),
-        Body(B), WhenExpr(When) {}
+        Body(B), Domain(Dom) {}
 
   NodeList *getParamList() { return Params.get(); }
   FuncParamDecl *getParam(size_t I) {
@@ -318,16 +343,17 @@ public:
   size_t getParamCount() const { return Params->size(); }
 
   const std::string &getId() const { return Id; }
-  Expression *getBody() const { return Body.get(); }
-  Expression *getWhenExpr() const { return WhenExpr.get(); }
-  Type *getReturnType() { return Body->getType(); }
+  NodeList *getBodyList() { return Body.get(); }
+  auto getBody() { return Body->getNodes(); }
+  FunctionDomain *getDomain() const { return Domain.get(); }
+
+  void setReturnType(Type *T) { RetTy = T; }
+  Type *getReturnType() { return RetTy; }
 
   auto getParamTypes() {
     return llvm::map_range(getParams(),
                            [](FuncParamDecl *Decl) { return Decl->getType(); });
   }
-
-  bool isPureTemplate() { return getParamCount(); }
 
   void print(llvm::raw_ostream &Os, unsigned Shift) const override;
   llvm::Value *codegen(Codegen &Gen) override;
@@ -346,8 +372,7 @@ class FunctionDecl : public Declaration {
   std::vector<std::unique_ptr<FunctionFragment>> Fragments;
 
 public:
-  FunctionDecl(FunctionFragment *F)
-      : Declaration(NK_FunctionDecl, F->getId()) {
+  FunctionDecl(FunctionFragment *F) : Declaration(NK_FunctionDecl, F->getId()) {
     appendFragment(F);
   }
   void appendFragment(FunctionFragment *Decl) { Fragments.emplace_back(Decl); }
@@ -426,6 +451,24 @@ public:
   }
 };
 
+class ReturnStmt : public ASTNode {
+  std::unique_ptr<Expression> Expr;
+public:
+  ReturnStmt(Expression *E) : ASTNode(NK_ReturnStmt), Expr(E) {}
+
+  Expression *getRetExpr() { return Expr.get(); }
+  Type *getRetType() { return Expr->getType(); }
+
+  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
+  ReturnStmt *clone() const override;
+
+  static bool classof(const ASTNode *N) {
+    return N->getNodeKind() == NK_ReturnStmt;
+  }
+};
+
 class CallableFunction : private NonCopyable {
 public:
   enum CallableType { CF_TemplateInstance, CF_ExternFunction };
@@ -452,13 +495,15 @@ class TemplateInstance : public CallableFunction {
   std::string MangledId;
 
 public:
-  TemplateInstance(FunctionDecl *FD) :
-    CallableFunction(CF_TemplateInstance), Decl(FD), MangledId(Decl->getId()) {}
+  TemplateInstance(FunctionDecl *FD)
+      : CallableFunction(CF_TemplateInstance), Decl(FD),
+        MangledId(Decl->getId()) {}
 
   FunctionDecl *getDecl() { return Decl.get(); }
 
   // TODO: mangle Id based on parameter types
-  void setIdPrefix(const std::string &P) { MangledId = P + MangledId; }
+  void addIdPrefix(const std::string &P) { MangledId = P + MangledId; }
+  void addIdPostfix(const std::string &P) { MangledId += P; }
   const std::string &getId() const override { return MangledId; }
 
   static bool classof(const CallableFunction *F) {

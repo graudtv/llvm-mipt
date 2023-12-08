@@ -123,15 +123,33 @@ FuncParamDecl *FuncParamDecl::clone() const {
   return new FuncParamDecl(getId(), IsRef);
 }
 
+void FunctionDomain::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "FunctionDomain";
+  if (isGlobal())
+    Os << ": global\n";
+  else if (isOtherwise())
+    Os << ": otherwise\n";
+  else {
+    Os << '\n';
+    Expr->print(Os, Shift + 1);
+  }
+}
+
+FunctionDomain *FunctionDomain::clone() const {
+  if (isCustom())
+    return new FunctionDomain(Expr->clone());
+  return new FunctionDomain(isGlobal());
+}
+
 void FunctionFragment::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "FunctionFragment '" << getId() << "'\n";
+  Domain->print(Os, Shift + 1);
   Params->print(Os, Shift + 1);
   Body->print(Os, Shift + 1);
 }
 
 FunctionFragment *FunctionFragment::clone() const {
-  return new FunctionFragment(getId(), Params->clone(), Body->clone(),
-                              WhenExpr ? WhenExpr->clone() : nullptr);
+  return new FunctionFragment(getId(), Params->clone(), Body->clone(), Domain->clone());
 }
 
 void FunctionDecl::print(llvm::raw_ostream &Os, unsigned Shift) const {
@@ -168,4 +186,13 @@ void BuiltinTypeExpr::print(llvm::raw_ostream &Os, unsigned Shift) const {
 
 BuiltinTypeExpr *BuiltinTypeExpr::clone() const {
   return new BuiltinTypeExpr(getReferencedType());
+}
+
+void ReturnStmt::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "ReturnStmt\n";
+  Expr->print(Os, Shift + 1);
+}
+
+ReturnStmt *ReturnStmt::clone() const {
+  return new ReturnStmt(Expr->clone());
 }

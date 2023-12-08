@@ -2,7 +2,12 @@
 %option yylineno
 
 %{
-namespace mercy { class ASTNode; class NodeList; class Expression; }
+namespace mercy {
+class ASTNode;
+class NodeList;
+class Expression;
+class FunctionDomain;
+} // namespace mercy
 
 #include "parser.tab.h"
 %}
@@ -44,9 +49,10 @@ uint64          { return TK_uint64; }
 let             { return TK_let; }
 return          { return TK_return; }
 when            { return TK_when; }
+otherwise       { return TK_otherwise; }
 
   /* identifier */
-[a-zA-Z_.]+     { yylval.TK_identifier = strdup(yytext); return TK_identifier; }
+[a-zA-Z_][a-zA-Z_0-9]*   { yylval.TK_identifier = strdup(yytext); return TK_identifier; }
 
   /* anything else */
 .               { return *yytext; }

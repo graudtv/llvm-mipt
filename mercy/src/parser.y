@@ -35,7 +35,7 @@ static std::unique_ptr<ASTNode> ParserResult;
 %token RSHIFT ">>";
 
 %token void bool int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64;
-%token let return when
+%token let return when otherwise
 
 %token ',' "comma";
 %nterm<mercy::ASTNode *>
@@ -58,14 +58,15 @@ static std::unique_ptr<ASTNode> ParserResult;
   prefix-expression
   postfix-expression
   primary-expression
-  type-expression
-  builtin-type;
+  builtin-type
 
 %nterm<mercy::NodeList *>
   statement-list
   expression-list
   optional-function-parameter-list
   function-parameter-list
+
+%nterm<mercy::FunctionDomain *> optional-domain
 
 %start program
 
@@ -76,33 +77,32 @@ program: translation-unit
 translation-unit
     : statement-list { ParserResult = std::unique_ptr<ASTNode>($1); }
     | %empty { ParserResult = std::make_unique<NodeList>(); }
+
+declaration
+    : let identifier '=' expression ';' { $$ = new VariableDecl($2, $4, /*IsRef=*/ false); free($2); }
+    | let '&' identifier '=' expression ';' { $$ = new VariableDecl($3, $5, /*IsRef=*/ true); free($3); }
+    | let identifier '(' optional-function-parameter-list ')' '{' statement-list '}' optional-domain ';' { $$ = new FunctionFragment($2, $4, $7, $9); free($2); }
+    | let identifier '(' optional-function-parameter-list ')' '=' expression optional-domain ';' { $$ = new FunctionFragment($2, $4, new NodeList(new ReturnStmt($7)), $8); free($2); }
+optional-function-parameter-list
+    : function-parameter-list
+    | %empty { $$ = new NodeList; }
+function-parameter-list
+    : function-parameter-list ',' function-parameter { $1->append($3); $$ = $1; }
+    | function-parameter { $$ = new NodeList($1); }
+function-parameter
+    : identifier { $$ = new FuncParamDecl($1, /*IsRef=*/ false); free($1); }
+    | '&' identifier { $$ = new FuncParamDecl($2, /*IsRef=*/ true); free($2); }
 statement-list
     : statement-list statement { $1->append($2); $$ = $1; }
     | statement { $$ = new NodeList($1); }
 statement
     : declaration { $$ = $1; }
     | expression ';' { $$ = $1; }
-    //| return expression ';'
-
-
-declaration
-    : let identifier '=' expression ';' { $$ = new VariableDecl($2, $4, /*IsRef=*/ false); free($2); }
-    | let '&' identifier '=' expression ';' { $$ = new VariableDecl($3, $5, /*IsRef=*/ true); free($3); }
-    | let identifier '(' optional-function-parameter-list ')' '=' expression ';' { $$ = new FunctionFragment($2, $4, $7); free($2); }
-    | let identifier '(' optional-function-parameter-list ')' '=' expression when expression ';' { $$ = new FunctionFragment($2, $4, $7, $9); free($2); }
-
-optional-function-parameter-list
-    : function-parameter-list
-    | %empty { $$ = new NodeList; }
-
-function-parameter-list
-    : function-parameter-list ',' function-parameter { $1->append($3); $$ = $1; }
-    | function-parameter { $$ = new NodeList($1); }
-
-function-parameter
-    : identifier { $$ = new FuncParamDecl($1, /*IsRef=*/ false); free($1); }
-    | '&' identifier { $$ = new FuncParamDecl($2, /*IsRef=*/ true); free($2); }
-
+    | return expression ';' { $$ = new ReturnStmt($2); }
+optional-domain
+    : when expression { $$ = new FunctionDomain($2); }
+    | otherwise { $$ = new FunctionDomain(/*IsGlobal=*/ false); }
+    | %empty { $$ = new FunctionDomain(/*IsGlobal=*/ true); }
 
 expression
     : logical-or-expression
@@ -147,23 +147,18 @@ multiplicative-expression
 prefix-expression
     : '!' postfix-expression { $$ = new UnaryOperator(UnaryOperator::NOT, $2); }
     | postfix-expression
-
 postfix-expression
     : primary-expression '(' ')' { $$ = new FunctionCall($1); }
     | primary-expression '(' expression-list ')' { $$ = new FunctionCall($1, $3); }
     | primary-expression
-
-expression-list
-    : expression-list ',' expression { $1->append($3); $$ = $1; }
-    | expression { $$ = new NodeList($1); }
-
 primary-expression
     : identifier { $$ = new Identifier($1); free($1); }
     | inum { $$ = new IntegralLiteral($1); }
     | '(' expression ')' { $$ = $2; }
-    | type-expression
-
-type-expression: builtin-type
+    | builtin-type
+expression-list
+    : expression-list ',' expression { $1->append($3); $$ = $1; }
+    | expression { $$ = new NodeList($1); }
 
 builtin-type
     : void { $$ = new BuiltinTypeExpr(BuiltinType::getVoidTy()); }

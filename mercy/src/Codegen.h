@@ -30,6 +30,7 @@ public:
   llvm::Value *emitVariableDecl(VariableDecl *Decl);
   llvm::Value *emitFuncParamDecl(FuncParamDecl *Decl);
   llvm::Value *emitIdentifier(Identifier *Id);
+  llvm::Value *emitReturnStmt(ReturnStmt *Ret);
 
   void emitTemplateInstance(TemplateInstance *Instance);
 

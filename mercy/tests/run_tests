@@ -9,11 +9,16 @@ my $prefix = "";
 
 sub test_case {
   my %args = @_;
-  my $output = qx`echo '$args{source}' | ./mercy -S --emit-llvm | lli`;
-  chomp $output;
-  my $ok = ($output eq $args{expect});
-  printf "%-40s %s\n", "$prefix/$args{name}", ($ok ? "OK" : "FAIL");
-  ++$err_count unless $ok;
+  my $format = "%-40s %s\n";
+  if ($args{skip}) {
+    printf $format, "$prefix/$args{name}", "SKIP";
+  } else {
+    my $output = qx`echo '$args{source}' | ./mercy -S --emit-llvm | lli`;
+    chomp $output;
+    my $ok = ($output eq $args{expect});
+    printf $format, "$prefix/$args{name}", ($ok ? "OK" : "FAIL");
+    ++$err_count unless $ok;
+  }
 }
 
 my @tests = glob(dirname($0) . "/test_*");

@@ -24,6 +24,7 @@ VISIT_NODE(UnaryOperator)
 VISIT_NODE(FunctionCall)
 VISIT_NODE(VariableDecl)
 VISIT_NODE(Identifier)
+VISIT_NODE(ReturnStmt)
 
 SKIP_NODE(BuiltinTypeExpr)
 SKIP_NODE(FunctionFragment)
@@ -31,6 +32,8 @@ SKIP_NODE(FunctionFragment)
 UNREACHABLE_NODE(NodeList)
 UNREACHABLE_NODE(FuncParamDecl)
 UNREACHABLE_NODE(FunctionDecl)
+UNREACHABLE_NODE(FunctionDomain)
+
 
 namespace {
 
@@ -260,21 +263,31 @@ void Codegen::emitTemplateInstance(TemplateInstance *Instance) {
     for (size_t I = 0; I < FrontFragment->getParamCount(); ++I)
       Fragment->getParam(I)->setAddr(FrontFragment->getParam(I)->getAddr());
     /* Emit WhenExpr if exists */
-    if (Expression *WhenExpr = Fragment->getWhenExpr()) {
-      llvm::Value *Cond = WhenExpr->codegen(*this);
+    if (Fragment->getDomain()->isCustom()) {
+      llvm::Value *Cond = Fragment->getDomain()->getExpr()->codegen(*this);
       llvm::BasicBlock *TrueBB = llvm::BasicBlock::Create(Ctx, "domain", Func);
       NextBB = llvm::BasicBlock::Create(Ctx, "next", Func);
       Builder.CreateCondBr(Cond, TrueBB, NextBB);
       Builder.SetInsertPoint(TrueBB);
     }
     /* Generate function body */
-    Builder.CreateRet(Fragment->getBody()->codegen(*this));
+    bool HasRetInstr = false;
+    for (ASTNode *Stmt : Fragment->getBody()) {
+      llvm::Value *V = Stmt->codegen(*this);
+      if (llvm::isa<ReturnStmt>(Stmt)) {
+        HasRetInstr = true;
+        break;
+      }
+    }
+    if (!HasRetInstr)
+      Builder.CreateRetVoid();
     /* Move to the next domain */
     if (NextBB)
       Builder.SetInsertPoint(NextBB);
   }
   /* Runtime 'domain error' emission */
-  if (FD->getFragmentCount() > 1 || FrontFragment->getWhenExpr()) {
+  FunctionFragment *LastFragment = *std::prev(FD->getFragments().end());
+  if (LastFragment->getDomain()->isCustom()) {
     llvm::FunctionCallee Puts = M->getOrInsertFunction(
         "puts", Builder.getInt32Ty(), Builder.getInt8Ty()->getPointerTo());
     llvm::FunctionCallee Exit = M->getOrInsertFunction(
@@ -286,7 +299,7 @@ void Codegen::emitTemplateInstance(TemplateInstance *Instance) {
     assert(llvm::isa<BuiltinType>(FD->getReturnType()) &&
            "only builtin types implemented");
     BuiltinType *RetTy = llvm::cast<BuiltinType>(FD->getReturnType());
-    Builder.CreateRet(llvm::PoisonValue::get(RetTy->getLLVMType(Ctx)));
+    Builder.CreateUnreachable();
   }
 }
 
@@ -296,6 +309,13 @@ llvm::Value *Codegen::emitIdentifier(Identifier *Id) {
   BuiltinType *IdTy = llvm::cast<BuiltinType>(Id->getType());
   return Builder.CreateLoad(IdTy->getLLVMType(Ctx),
                             Id->getDeclaration()->getAddr());
+}
+
+llvm::Value *Codegen::emitReturnStmt(ReturnStmt *Ret) {
+  llvm::Value *V = Ret->getRetExpr()->codegen(*this);
+  if (Ret->getRetType() == BuiltinType::getVoidTy())
+    return Builder.CreateRetVoid();
+  return Builder.CreateRet(V);
 }
 
 void Codegen::run(ASTNode *AST, Sema &S) {

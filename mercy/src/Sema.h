@@ -7,9 +7,23 @@
 namespace mercy {
 
 class Scope {
+  Scope *Prev = nullptr;
+  std::string Name;
   std::unordered_map<std::string, Declaration *> Decls;
 
 public:
+  Scope(Scope *PrevScope = nullptr, std::string ScopeName = {})
+      : Prev(PrevScope), Name(std::move(ScopeName)) {}
+
+  Scope *getPrev() { return Prev; }
+  const std::string &getName() { return Name; }
+
+  bool contains(Declaration *Decl) {
+    auto It = llvm::find_if(
+        Decls, [Decl](auto &&Pair) { return Pair.second == Decl; });
+    return It != Decls.end();
+  }
+
   Declaration *find(const std::string &Id) {
     if (auto It = Decls.find(Id); It != Decls.end())
       return It->second;
@@ -22,7 +36,7 @@ public:
 };
 
 class Sema {
-  std::vector<Scope> Scopes;
+  Scope *CurScope = nullptr;
   using InstanceList = std::vector<TemplateInstance *>;
   std::unordered_map<FunctionDecl *, InstanceList> FunctionInstances;
 
@@ -33,12 +47,12 @@ class Sema {
 
   Declaration *findDecl(const std::string &Id);
   void insertDecl(Declaration *Decl);
-  void pushScope() { Scopes.emplace_back(); }
-  void popScope() { Scopes.pop_back(); }
 
   TemplateInstance *
   getOrCreateFunctionInstance(FunctionDecl *FD,
                               llvm::ArrayRef<Type *> ParamTys);
+
+  void actOnFunctionBody(FunctionFragment *Func);
 
 public:
   void actOnBinaryOperator(BinaryOperator *BinOp);
@@ -48,6 +62,7 @@ public:
   void actOnFunctionFragment(FunctionFragment *Fragment);
   void actOnFuncParamDecl(FuncParamDecl *Decl);
   void actOnIdentifier(Identifier *Id);
+  void actOnReturnStmt(ReturnStmt *Ret);
 
   void run(ASTNode *TU);
 
