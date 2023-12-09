@@ -30,6 +30,7 @@ class ASTNode : private NonCopyable {
 public:
   enum NodeKind {
     NK_IntegralLiteral,
+    NK_TypeExpr,
     NK_BinaryOperator,
     NK_UnaryOperator,
     NK_Identifier,
@@ -41,7 +42,6 @@ public:
     NK_FunctionDomain,
     NK_FunctionFragment,
     NK_FunctionDecl,
-    NK_BuiltinTypeExpr,
     NK_ReturnStmt,
     NK_TranslationUnit
   };
@@ -80,10 +80,10 @@ public:
 
   static bool classof(const ASTNode *N) {
     NodeKind NK = N->getNodeKind();
-    return NK == NK_IntegralLiteral || NK == NK_BinaryOperator ||
-           NK == NK_UnaryOperator || NK == NK_Identifier ||
-           NK == NK_FunctionCall || NK == NK_ArraySubscriptExpr ||
-           NK == NK_BuiltinTypeExpr;
+    return NK == NK_IntegralLiteral || NK == NK_TypeExpr ||
+           NK == NK_BinaryOperator || NK == NK_UnaryOperator ||
+           NK == NK_Identifier || NK == NK_FunctionCall ||
+           NK == NK_ArraySubscriptExpr;
   }
 };
 
@@ -103,6 +103,25 @@ public:
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_IntegralLiteral;
+  }
+};
+
+class TypeExpr : public Expression {
+  Type *GValue;
+
+public:
+  TypeExpr(Type *Ty)
+      : Expression(NK_TypeExpr, MetaType::get()), GValue(Ty) {}
+
+  Type *getValue() const { return GValue; }
+
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
+  llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
+  TypeExpr *clone() const override;
+
+  static bool classof(const ASTNode *N) {
+    return N->getNodeKind() == NK_TypeExpr;
   }
 };
 
@@ -408,16 +427,16 @@ public:
 };
 
 class FunctionCall : public Expression {
-  std::unique_ptr<ASTNode> Callee;
+  std::unique_ptr<Expression> Callee;
   std::unique_ptr<NodeList> Args;
   CallableFunction *CalleeFunc = nullptr;
 
 public:
-  FunctionCall(ASTNode *C, NodeList *ArgList)
+  FunctionCall(Expression *C, NodeList *ArgList)
       : Expression(NK_FunctionCall), Callee(C), Args(ArgList) {}
-  FunctionCall(ASTNode *C) : FunctionCall(C, new NodeList) {}
+  FunctionCall(Expression *C) : FunctionCall(C, new NodeList) {}
 
-  ASTNode *getCallee() { return Callee.get(); }
+  Expression *getCallee() { return Callee.get(); }
 
   NodeList *getArgList() { return Args.get(); }
   const NodeList *getArgList() const { return Args.get(); }
@@ -461,26 +480,6 @@ public:
   }
 };
 
-class BuiltinTypeExpr : public Expression {
-public:
-  BuiltinTypeExpr(BuiltinType *Ty)
-      : Expression(NK_BuiltinTypeExpr, MetaType::getTypeOf(Ty)) {}
-
-  BuiltinType *getReferencedType() const {
-    return llvm::cast<BuiltinType>(
-        llvm::cast<MetaType>(getType())->getReferencedType());
-  }
-
-  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
-  llvm::Value *codegen(Codegen &Gen) override;
-  void sema(Sema &S) override;
-  BuiltinTypeExpr *clone() const override;
-
-  static bool classof(const ASTNode *N) {
-    return N->getNodeKind() == NK_BuiltinTypeExpr;
-  }
-};
-
 class ReturnStmt : public ASTNode {
   std::unique_ptr<Expression> Expr;
 
@@ -515,7 +514,7 @@ public:
   TranslationUnit *clone() const override;
 
   static bool classof(const ASTNode *N) {
-    return N->getNodeKind() == NK_BuiltinTypeExpr;
+    return N->getNodeKind() == NK_TypeExpr;
   }
 };
 

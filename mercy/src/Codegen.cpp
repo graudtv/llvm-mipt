@@ -27,7 +27,7 @@ VISIT_NODE(VariableDecl)
 VISIT_NODE(Identifier)
 VISIT_NODE(ReturnStmt)
 
-SKIP_NODE(BuiltinTypeExpr)
+SKIP_NODE(TypeExpr)
 SKIP_NODE(FunctionFragment)
 
 UNREACHABLE_NODE(NodeList)
@@ -82,8 +82,6 @@ llvm::FunctionCallee Codegen::getOrInsertPrintFunc(BuiltinType *Ty) {
     return getOrInsertPrintFunc(Builder.getInt64Ty(), "i64", "%ld\n");
   if (Ty->isUint64())
     return getOrInsertPrintFunc(Builder.getInt64Ty(), "u64", "%lu\n");
-  if (Ty->isUintptr())
-    return getOrInsertPrintFunc(Ty->getLLVMType(Ctx), "uintptr", "0x%lx\n");
   llvm_unreachable("unhandled builtin type");
 }
 
@@ -249,7 +247,7 @@ llvm::Value *Codegen::emitUnaryOperator(UnaryOperator *Op) {
 }
 
 llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
-  ASTNode *Callee = FC->getCallee();
+  Expression *Callee = FC->getCallee();
 
   /* Generate each function argument */
   std::vector<llvm::Value *> Arguments;
@@ -257,9 +255,9 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
     Arguments.push_back(Arg->codegen(*this));
 
   /* Handle type conversions */
-  if (auto *BTE = llvm::dyn_cast<BuiltinTypeExpr>(Callee)) {
+  if (auto *TE = llvm::dyn_cast<TypeExpr>(Callee)) {
     /* Conversion to builtin type */
-    if (auto *CastTy = llvm::dyn_cast<BuiltinType>(BTE->getReferencedType())) {
+    if (auto *CastTy = llvm::dyn_cast<BuiltinType>(TE->getValue())) {
       return Builder.CreateIntCast(Arguments.front(), CastTy->getLLVMType(Ctx),
                                    CastTy->isSigned());
     }

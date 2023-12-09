@@ -28,14 +28,14 @@ VISIT_NODE(TranslationUnit)
 
 SKIP_NODE(IntegralLiteral)
 
-UNREACHABLE_NODE(BuiltinTypeExpr)
+UNREACHABLE_NODE(TypeExpr)
 UNREACHABLE_NODE(NodeList)
 UNREACHABLE_NODE(FunctionDecl)
 UNREACHABLE_NODE(FunctionDomain)
 
 namespace {
 void emitError(const llvm::Twine &T) {
-  llvm::errs() << "error: "<< T << '\n';
+  llvm::errs() << "error: " << T << '\n';
   exit(1);
 }
 void emitError(ASTNode *Node, const llvm::Twine &T) {
@@ -199,7 +199,7 @@ void Sema::actOnUnaryOperator(UnaryOperator *Op) {
 }
 
 void Sema::actOnFunctionCall(FunctionCall *FC) {
-  ASTNode *Callee = FC->getCallee();
+  Expression *Callee = FC->getCallee();
   std::vector<Type *> ArgTys;
 
   for (Expression *Arg : FC->getArgs()) {
@@ -208,9 +208,9 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
   }
 
   /* Handle type conversions */
-  if (auto *BTE = llvm::dyn_cast<BuiltinTypeExpr>(Callee)) {
+  if (auto *TE = llvm::dyn_cast<TypeExpr>(Callee)) {
     /* Conversion to builtin type */
-    if (auto *CastTy = llvm::dyn_cast<BuiltinType>(BTE->getReferencedType())) {
+    if (auto *CastTy = llvm::dyn_cast<BuiltinType>(TE->getValue())) {
       if (FC->getArgCount() != 1) {
         emitError(Callee, "invalid number of arguments in cast to '" +
                               CastTy->toString() + "'");
@@ -224,8 +224,8 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
       FC->setType(CastTy);
       return;
     }
-    // TODO: array constructor
-    assert(0 && "unimplemented or illegal cast");
+    emitError(Callee, "type '" + TE->getValue()->toString() +
+              "' cannot be used as function name");
   }
   if (Identifier *Id = llvm::dyn_cast<Identifier>(Callee)) {
     if (Id->getName() == "print") {
@@ -245,8 +245,7 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
   assert(0 && "not implemented: cannot handle call");
 }
 
-void Sema::actOnArraySubscriptExpr(ArraySubscriptExpr *Expr) {
-}
+void Sema::actOnArraySubscriptExpr(ArraySubscriptExpr *Expr) {}
 
 /* Insert declaration into the current scope */
 void Sema::actOnVariableDecl(VariableDecl *Decl) {

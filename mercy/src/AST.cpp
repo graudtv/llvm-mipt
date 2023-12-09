@@ -61,6 +61,14 @@ IntegralLiteral *IntegralLiteral::clone() const {
   return new IntegralLiteral(Value);
 }
 
+void TypeExpr::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "TypeExpr '" << *GValue << "'\n";
+}
+
+TypeExpr *TypeExpr::clone() const {
+  return new TypeExpr(GValue);
+}
+
 const char *BinaryOperator::getMnemonic() const {
   return getBinaryOpKindStr(Kind);
 }
@@ -186,16 +194,6 @@ void ArraySubscriptExpr::print(llvm::raw_ostream &Os, unsigned Shift) const {
 
 ArraySubscriptExpr *ArraySubscriptExpr::clone() const {
   return new ArraySubscriptExpr(Array->clone(), Index->clone());
-}
-
-void BuiltinTypeExpr::print(llvm::raw_ostream &Os, unsigned Shift) const {
-  Os << tabulate(Shift) << "BuiltinTypeExpr '";
-  getType()->print(Os);
-  Os << "'\n";
-}
-
-BuiltinTypeExpr *BuiltinTypeExpr::clone() const {
-  return new BuiltinTypeExpr(getReferencedType());
 }
 
 void ReturnStmt::print(llvm::raw_ostream &Os, unsigned Shift) const {

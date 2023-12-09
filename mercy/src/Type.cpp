@@ -18,7 +18,6 @@ const char *getBuiltinTypeName(BuiltinType::BuiltinKind K) {
   case BuiltinType::Uint16: return "uint16";
   case BuiltinType::Uint32: return "uint32";
   case BuiltinType::Uint64: return "uint64";
-  case BuiltinType::Uintptr: return "uintptr";
   }
   llvm_unreachable("invalid builtin type");
   // clang-format on
@@ -36,20 +35,14 @@ BuiltinType BuiltinType::Uint8Ty{BuiltinType::Uint8};
 BuiltinType BuiltinType::Uint16Ty{BuiltinType::Uint16};
 BuiltinType BuiltinType::Uint32Ty{BuiltinType::Uint32};
 BuiltinType BuiltinType::Uint64Ty{BuiltinType::Uint64};
-std::unordered_map<Type *, MetaType> MetaType::MetaTypes;
+std::unordered_map<Type *, ArrayType> ArrayType::ArrayTypes;
+MetaType MetaType::Instance{};
 
 std::string Type::toString() const {
   std::string Res;
   llvm::raw_string_ostream Os{Res};
   print(Os);
   return Res;
-}
-
-Type *MetaType::getTypeOf(Type *T) {
-  if (auto It = MetaTypes.find(T); It != MetaTypes.end())
-    return &It->second;
-  auto It = MetaTypes.emplace(std::make_pair(T, MetaType(T))).first;
-  return &It->second;
 }
 
 /* uintptr doesn't count as unsigned type, because it's opaque */
@@ -77,7 +70,6 @@ llvm::Type *BuiltinType::getLLVMType(llvm::LLVMContext &Ctx) const {
     return llvm::Type::getInt32Ty(Ctx);
   case Int64:
   case Uint64:
-  case Uintptr:
     return llvm::Type::getInt64Ty(Ctx);
   }
   llvm_unreachable("unhandled type");
@@ -87,8 +79,17 @@ void BuiltinType::print(llvm::raw_ostream &Os) const {
   Os << getBuiltinTypeName(BK);
 }
 
+ArrayType *ArrayType::get(Type *T) {
+  if (auto It = ArrayTypes.find(T); It != ArrayTypes.end())
+    return &It->second;
+  auto It = ArrayTypes.emplace(std::make_pair(T, ArrayType(T))).first;
+  return &It->second;
+}
+
+void ArrayType::print(llvm::raw_ostream &Os) const {
+  Os << "array_type(" << *ElementTy << ')';
+}
+
 void MetaType::print(llvm::raw_ostream &Os) const {
-  Os << "typeof(";
-  RefTy->print(Os);
-  Os << ")";
+  Os << "MetaType";
 }

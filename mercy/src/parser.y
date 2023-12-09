@@ -165,18 +165,18 @@ expression-list
     | expression { $$ = new NodeList($1); }
 
 builtin-type
-    : void { $$ = new BuiltinTypeExpr(BuiltinType::getVoidTy()); }
-    | bool { $$ = new BuiltinTypeExpr(BuiltinType::getBoolTy()); }
-    | int   { $$ = new BuiltinTypeExpr(BuiltinType::getIntTy()); }
-    | int8  { $$ = new BuiltinTypeExpr(BuiltinType::getInt8Ty()); }
-    | int16 { $$ = new BuiltinTypeExpr(BuiltinType::getInt16Ty()); }
-    | int32 { $$ = new BuiltinTypeExpr(BuiltinType::getInt32Ty()); }
-    | int64 { $$ = new BuiltinTypeExpr(BuiltinType::getInt64Ty()); }
-    | uint   { $$ = new BuiltinTypeExpr(BuiltinType::getUintTy()); }
-    | uint8  { $$ = new BuiltinTypeExpr(BuiltinType::getUint8Ty()); }
-    | uint16 { $$ = new BuiltinTypeExpr(BuiltinType::getUint16Ty()); }
-    | uint32 { $$ = new BuiltinTypeExpr(BuiltinType::getUint32Ty()); }
-    | uint64 { $$ = new BuiltinTypeExpr(BuiltinType::getUint64Ty()); }
+    : void { $$ = new TypeExpr(BuiltinType::getVoidTy()); }
+    | bool { $$ = new TypeExpr(BuiltinType::getBoolTy()); }
+    | int   { $$ = new TypeExpr(BuiltinType::getIntTy()); }
+    | int8  { $$ = new TypeExpr(BuiltinType::getInt8Ty()); }
+    | int16 { $$ = new TypeExpr(BuiltinType::getInt16Ty()); }
+    | int32 { $$ = new TypeExpr(BuiltinType::getInt32Ty()); }
+    | int64 { $$ = new TypeExpr(BuiltinType::getInt64Ty()); }
+    | uint   { $$ = new TypeExpr(BuiltinType::getUintTy()); }
+    | uint8  { $$ = new TypeExpr(BuiltinType::getUint8Ty()); }
+    | uint16 { $$ = new TypeExpr(BuiltinType::getUint16Ty()); }
+    | uint32 { $$ = new TypeExpr(BuiltinType::getUint32Ty()); }
+    | uint64 { $$ = new TypeExpr(BuiltinType::getUint64Ty()); }
 
 %%
 

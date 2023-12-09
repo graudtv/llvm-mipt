@@ -1,14 +1,14 @@
 #pragma once
 
-#include <llvm/Support/raw_ostream.h>
 #include <llvm/IR/Type.h>
+#include <llvm/Support/raw_ostream.h>
 #include <unordered_map>
 
 namespace mercy {
 
 class Type {
 public:
-  enum TypeKind { TK_BuiltinType, TK_FunctionType, TK_ArrayType, TK_MetaType};
+  enum TypeKind { TK_BuiltinType, TK_FunctionType, TK_ArrayType, TK_MetaType };
 
 private:
   TypeKind TK;
@@ -40,8 +40,7 @@ public:
     Uint8,
     Uint16,
     Uint32,
-    Uint64,
-    Uintptr
+    Uint64
   };
 
 private:
@@ -79,7 +78,6 @@ public:
   bool isUint16() const { return BK == Uint16; }
   bool isUint32() const { return BK == Uint32; }
   bool isUint64() const { return BK == Uint64; }
-  bool isUintptr() const { return BK == Uintptr; }
 
   bool isSigned() const;
   bool isUnsigned() const;
@@ -92,20 +90,35 @@ public:
   static bool classof(const Type *T) { return T->isBuiltinType(); }
 };
 
-/* MetaType is type of some Type */
-class MetaType : public Type {
-  Type *RefTy;
-  MetaType(Type *ReferencedTy) : Type(TK_MetaType), RefTy(ReferencedTy) {}
+class ArrayType : public Type {
+  Type *ElementTy;
 
-  static std::unordered_map<Type *, MetaType> MetaTypes;
+  ArrayType(Type *ElemTy) : Type(TK_ArrayType), ElementTy(ElemTy) {}
+  static std::unordered_map<Type *, ArrayType> ArrayTypes;
+
 public:
-  static Type *getTypeOf(Type *T);
+  static ArrayType *get(Type *ElemTy);
+  Type *getElemTy() { return ElementTy; }
 
-  Type *getReferencedType() { return RefTy; }
-  const Type *getReferencedType() const { return RefTy; }
   void print(llvm::raw_ostream &Os) const override;
+  static bool classof(const Type *T) { return T->isArrayType(); }
+};
 
+/* MetaType is type of all Types */
+class MetaType : public Type {
+  static MetaType Instance;
+  MetaType() : Type(TK_MetaType){};
+
+public:
+  static MetaType *get() { return &Instance; }
+
+  void print(llvm::raw_ostream &Os) const override;
   static bool classof(const Type *T) { return T->isMetaType(); }
 };
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &Os, const Type &T) {
+  T.print(Os);
+  return Os;
+}
 
 } // namespace mercy
