@@ -250,3 +250,16 @@ END
   expect => "37"
 );
 
+test_case(name => "assignment", source => <<"END",
+  let main() {
+    let x = 5;
+    let y = 7;
+    let tmp = x;
+    x = y;
+    y = tmp;
+    print(x);
+    print(y);
+  };
+END
+  expect => "7\n5"
+);

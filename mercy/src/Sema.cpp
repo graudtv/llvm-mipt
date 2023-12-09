@@ -172,6 +172,9 @@ void Sema::actOnBinaryOperator(BinaryOperator *BinOp) {
   bool IsCmp = (BK == BinaryOperator::EQ || BK == BinaryOperator::NE ||
                 BK == BinaryOperator::LT || BK == BinaryOperator::GT ||
                 BK == BinaryOperator::LE || BK == BinaryOperator::GE);
+  bool IsAssignment = (BK == BinaryOperator::ASSIGN);
+  if (IsAssignment && !LHS->isLValue())
+    emitError(LHS, "expression is not assignable");
   if (IsLogicalOp && !OperandType->isBool())
     emitError(BinOp, llvm::Twine{"invalid operand types for operator '"} +
                          BinOp->getMnemonic() + "', must be booleans");

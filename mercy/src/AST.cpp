@@ -20,6 +20,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &Os, const tabulate &T) {
 const char *getBinaryOpKindStr(BinaryOperator::BinOpKind Kind) {
   // clang-format off
   switch (Kind) {
+  case BinaryOperator::ASSIGN: return "=";
   case BinaryOperator::LOR: return "||";
   case BinaryOperator::LAND: return "&&";
   case BinaryOperator::OR: return "|";
@@ -52,6 +53,10 @@ const char *getUnaryOpKindStr(UnaryOperator::UnaryOpKind Kind) {
 }
 
 } // namespace
+
+bool Expression::isLValue() const {
+  return llvm::isa<Identifier>(this) || llvm::isa<ArraySubscriptExpr>(this);
+}
 
 void IntegralLiteral::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "IntegralLiteral " << Value << '\n';

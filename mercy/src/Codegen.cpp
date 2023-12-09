@@ -138,7 +138,7 @@ void Codegen::emitTemplateInstance(TemplateInstance *Instance) {
       Fragment->getParam(I)->setAddr(FrontFragment->getParam(I)->getAddr());
     /* Emit WhenExpr if exists */
     if (Fragment->getDomain()->isCustom()) {
-      llvm::Value *Cond = Fragment->getDomain()->getExpr()->codegen(*this);
+      llvm::Value *Cond = emitAsRValue(Fragment->getDomain()->getExpr());
       llvm::BasicBlock *TrueBB = llvm::BasicBlock::Create(Ctx, "domain", Func);
       NextBB = llvm::BasicBlock::Create(Ctx, "next", Func);
       Builder.CreateCondBr(Cond, TrueBB, NextBB);
@@ -177,6 +177,16 @@ void Codegen::emitTemplateInstance(TemplateInstance *Instance) {
   }
 }
 
+/* When emitting lvalues, their address is returned instead of the value
+ * itself, because lvalues can also occur as lhs in assignment. This function
+ * performs lvalue to rvalue propogation if necessary */
+llvm::Value *Codegen::emitAsRValue(Expression *E) {
+  llvm::Value *V = E->codegen(*this);
+  if (E->isLValue())
+    return Builder.CreateLoad(E->getType()->getLLVMType(Ctx), V);
+  return V;
+}
+
 Codegen::Codegen() : Ctx(), Builder(Ctx) {
   M = std::make_unique<llvm::Module>("top", Ctx);
 }
@@ -186,12 +196,17 @@ llvm::Value *Codegen::emitIntegralLiteral(IntegralLiteral *IL) {
 }
 
 llvm::Value *Codegen::emitBinaryOperator(BinaryOperator *BinOp) {
-  llvm::Value *LHS = BinOp->getLHS()->codegen(*this);
-  llvm::Value *RHS = BinOp->getRHS()->codegen(*this);
+  bool IsAssignment = BinOp->getKind() == BinaryOperator::ASSIGN;
+  llvm::Value *LHS = IsAssignment ? BinOp->getLHS()->codegen(*this)
+                                  : emitAsRValue(BinOp->getLHS());
+  llvm::Value *RHS = emitAsRValue(BinOp->getRHS());
 
   BuiltinType *ResTy = llvm::cast<BuiltinType>(BinOp->getType());
   BuiltinType *OperandTy = llvm::cast<BuiltinType>(BinOp->getLHS()->getType());
   switch (BinOp->getKind()) {
+  case BinaryOperator::ASSIGN:
+    Builder.CreateStore(RHS, LHS);
+    return RHS;
   case BinaryOperator::LOR:
     return Builder.CreateLogicalOr(LHS, RHS);
   case BinaryOperator::LAND:
@@ -240,7 +255,7 @@ llvm::Value *Codegen::emitBinaryOperator(BinaryOperator *BinOp) {
 }
 
 llvm::Value *Codegen::emitUnaryOperator(UnaryOperator *Op) {
-  llvm::Value *Expr = Op->getExpr()->codegen(*this);
+  llvm::Value *Expr = emitAsRValue(Op->getExpr());
   if (Op->getKind() == UnaryOperator::NOT)
     return Builder.CreateNot(Expr);
   llvm_unreachable("unhandled unary operator kind");
@@ -252,7 +267,7 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
   /* Generate each function argument */
   std::vector<llvm::Value *> Arguments;
   for (Expression *Arg : FC->getArgs())
-    Arguments.push_back(Arg->codegen(*this));
+    Arguments.push_back(emitAsRValue(Arg));
 
   /* Handle type conversions */
   if (auto *TE = llvm::dyn_cast<TypeExpr>(Callee)) {
@@ -304,21 +319,20 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
 }
 
 llvm::Value *Codegen::emitArraySubscriptExpr(ArraySubscriptExpr *Expr) {
-  llvm::Value *Arr = Expr->getArray()->codegen(*this);
-  llvm::Value *Idx = Expr->getIndex()->codegen(*this);
+  llvm::Value *Arr = emitAsRValue(Expr->getArray());
+  llvm::Value *Idx = emitAsRValue(Expr->getIndex());
 
   assert(llvm::isa<BuiltinType>(Expr->getType()) &&
          "arrays of non-builtin types are not implemented");
   llvm::Type *ElemTy =
       llvm::cast<BuiltinType>(Expr->getType())->getLLVMType(Ctx);
 
-  llvm::Value *Ptr = Builder.CreateGEP(ElemTy, Arr, Idx, "elem_ptr");
-  return Builder.CreateLoad(ElemTy, Ptr, "elem");
+  return Builder.CreateGEP(ElemTy, Arr, Idx, "elem_ptr");
 }
 
 llvm::Value *Codegen::emitVariableDecl(VariableDecl *Decl) {
   assert(!Decl->isRef() && "references not implemented");
-  llvm::Value *Initializer = Decl->getInitializer()->codegen(*this);
+  llvm::Value *Initializer = emitAsRValue(Decl->getInitializer());
   llvm::Value *Addr =
       Builder.CreateAlloca(Initializer->getType(), nullptr, Decl->getId());
   Decl->setAddr(Addr);
@@ -327,12 +341,13 @@ llvm::Value *Codegen::emitVariableDecl(VariableDecl *Decl) {
 }
 
 llvm::Value *Codegen::emitIdentifier(Identifier *Id) {
+  return Id->getDeclaration()->getAddr();
   return Builder.CreateLoad(Id->getType()->getLLVMType(Ctx),
                             Id->getDeclaration()->getAddr());
 }
 
 llvm::Value *Codegen::emitReturnStmt(ReturnStmt *Ret) {
-  llvm::Value *V = Ret->getRetExpr()->codegen(*this);
+  llvm::Value *V = emitAsRValue(Ret->getRetExpr());
   if (Ret->getRetType() == BuiltinType::getVoidTy())
     return Builder.CreateRetVoid();
   return Builder.CreateRet(V);

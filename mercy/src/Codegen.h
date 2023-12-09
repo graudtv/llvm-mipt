@@ -21,6 +21,7 @@ class Codegen {
   llvm::FunctionCallee getOrInsertFunction(CallableFunction *F);
   llvm::FunctionCallee getOrInsertInstanceDecl(TemplateInstance *Instance);
   void emitTemplateInstance(TemplateInstance *Instance);
+  llvm::Value *emitAsRValue(Expression *E);
 
 public:
   Codegen();

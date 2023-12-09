@@ -45,6 +45,7 @@ static std::unique_ptr<TranslationUnit> ParserResult;
 
 %nterm<mercy::Expression *>
   expression
+  assignment-expression
   logical-or-expression
   logical-and-expression
   or-expression
@@ -108,7 +109,10 @@ optional-domain
     | %empty { $$ = new FunctionDomain(/*IsGlobal=*/ true); }
 
 expression
-    : logical-or-expression
+    : assignment-expression
+assignment-expression
+    : postfix-expression '=' assignment-expression { $$ = new BinaryOperator(BinaryOperator::ASSIGN, $1, $3); }
+    | logical-or-expression
 logical-or-expression
     : logical-or-expression "||" logical-and-expression { $$ = new BinaryOperator(BinaryOperator::LOR, $1, $3); }
     | logical-and-expression

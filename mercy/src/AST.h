@@ -78,6 +78,8 @@ public:
 
   Expression(NodeKind NK, Type *T = nullptr) : ASTNode(NK), Ty(T) {}
 
+  bool isLValue() const;
+
   static bool classof(const ASTNode *N) {
     NodeKind NK = N->getNodeKind();
     return NK == NK_IntegralLiteral || NK == NK_TypeExpr ||
@@ -129,7 +131,7 @@ class BinaryOperator : public Expression {
 public:
   // clang-format off
   enum BinOpKind {
-    LOR, LAND, OR, XOR, AND,
+    ASSIGN, LOR, LAND, OR, XOR, AND,
     EQ, NE, LT, GT, LE, GE, LSHIFT, RSHIFT,
     ADD, SUB, MUL, DIV, REM
   };
