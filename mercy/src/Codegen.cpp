@@ -22,6 +22,7 @@ VISIT_NODE(IntegralLiteral)
 VISIT_NODE(BinaryOperator)
 VISIT_NODE(UnaryOperator)
 VISIT_NODE(FunctionCall)
+VISIT_NODE(ArraySubscriptExpr)
 VISIT_NODE(VariableDecl)
 VISIT_NODE(Identifier)
 VISIT_NODE(ReturnStmt)
@@ -289,6 +290,10 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
     }
   }
   return Builder.CreateCall(getOrInsertFunction(FC->getCalleeFunc()), Arguments);
+}
+
+llvm::Value *Codegen::emitArraySubscriptExpr(ArraySubscriptExpr *Expr) {
+  return nullptr;
 }
 
 llvm::Value *Codegen::emitVariableDecl(VariableDecl *Decl) {

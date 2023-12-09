@@ -61,6 +61,7 @@ public:
   void actOnBinaryOperator(BinaryOperator *BinOp);
   void actOnUnaryOperator(UnaryOperator *Op);
   void actOnFunctionCall(FunctionCall *FC);
+  void actOnArraySubscriptExpr(ArraySubscriptExpr *Expr);
   void actOnVariableDecl(VariableDecl *Decl);
   void actOnFunctionFragment(FunctionFragment *Fragment);
   void actOnFuncParamDecl(FuncParamDecl *Decl);

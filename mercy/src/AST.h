@@ -34,6 +34,7 @@ public:
     NK_UnaryOperator,
     NK_Identifier,
     NK_FunctionCall,
+    NK_ArraySubscriptExpr,
     NK_NodeList,
     NK_VariableDecl,
     NK_FuncParamDecl,
@@ -81,7 +82,8 @@ public:
     NodeKind NK = N->getNodeKind();
     return NK == NK_IntegralLiteral || NK == NK_BinaryOperator ||
            NK == NK_UnaryOperator || NK == NK_Identifier ||
-           NK == NK_FunctionCall || NK == NK_BuiltinTypeExpr;
+           NK == NK_FunctionCall || NK == NK_ArraySubscriptExpr ||
+           NK == NK_BuiltinTypeExpr;
   }
 };
 
@@ -435,6 +437,27 @@ public:
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_FunctionCall;
+  }
+};
+
+class ArraySubscriptExpr : public Expression {
+  std::unique_ptr<Expression> Array;
+  std::unique_ptr<Expression> Index;
+
+public:
+  ArraySubscriptExpr(Expression *Arr, Expression *Idx)
+      : Expression(NK_ArraySubscriptExpr), Array(Arr), Index(Idx) {}
+
+  Expression *getArray() { return Array.get(); }
+  Expression *getIndex() { return Index.get(); }
+
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
+  llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
+  ArraySubscriptExpr *clone() const override;
+
+  static bool classof(const ASTNode *N) {
+    return N->getNodeKind() == NK_ArraySubscriptExpr;
   }
 };
 

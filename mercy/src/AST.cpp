@@ -178,6 +178,16 @@ FunctionCall *FunctionCall::clone() const {
   return new FunctionCall(Callee->clone(), Args->clone());
 }
 
+void ArraySubscriptExpr::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "ArraySubscriptExpr\n";
+  Array->print(Os, Shift + 1);
+  Index->print(Os, Shift + 1);
+}
+
+ArraySubscriptExpr *ArraySubscriptExpr::clone() const {
+  return new ArraySubscriptExpr(Array->clone(), Index->clone());
+}
+
 void BuiltinTypeExpr::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "BuiltinTypeExpr '";
   getType()->print(Os);

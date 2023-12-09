@@ -28,6 +28,7 @@ public:
   llvm::Value *emitBinaryOperator(BinaryOperator *BinOp);
   llvm::Value *emitUnaryOperator(UnaryOperator *Op);
   llvm::Value *emitFunctionCall(FunctionCall *FC);
+  llvm::Value *emitArraySubscriptExpr(ArraySubscriptExpr *Expr);
   llvm::Value *emitVariableDecl(VariableDecl *Decl);
   llvm::Value *emitFuncParamDecl(FuncParamDecl *Decl);
   llvm::Value *emitIdentifier(Identifier *Id);

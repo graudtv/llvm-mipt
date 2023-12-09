@@ -18,6 +18,7 @@ using namespace mercy;
 VISIT_NODE(BinaryOperator)
 VISIT_NODE(UnaryOperator)
 VISIT_NODE(FunctionCall)
+VISIT_NODE(ArraySubscriptExpr)
 VISIT_NODE(VariableDecl)
 VISIT_NODE(FunctionFragment)
 VISIT_NODE(FuncParamDecl)
@@ -242,6 +243,9 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
     return;
   };
   assert(0 && "not implemented: cannot handle call");
+}
+
+void Sema::actOnArraySubscriptExpr(ArraySubscriptExpr *Expr) {
 }
 
 /* Insert declaration into the current scope */
