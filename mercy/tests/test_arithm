@@ -263,3 +263,15 @@ test_case(name => "assignment", source => <<"END",
 END
   expect => "7\n5"
 );
+
+test_case(name => "multiassignment", source => <<"END",
+  let main() {
+    let x = 0; let y = 0; let z = 0;
+    x = y = z = 100;
+    print(x);
+    print(y);
+    print(z);
+  };
+END
+  expect => "100\n100\n100"
+);
