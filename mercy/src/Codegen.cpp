@@ -292,8 +292,7 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
   if (Id == "alloca") {
     assert(llvm::isa<ArrayType>(FC->getType()));
     Type *ElemTy = llvm::cast<ArrayType>(FC->getType())->getElemTy();
-    return Builder.CreateAlloca(ElemTy->getLLVMType(Ctx),
-                                Builder.getInt32(Arguments.size()),
+    return Builder.CreateAlloca(ElemTy->getLLVMType(Ctx), Arguments[1],
                                 "anon_array");
   }
   if (Id == "print") {
@@ -354,9 +353,21 @@ llvm::Value *Codegen::emitReturnStmt(ReturnStmt *Ret) {
 void Codegen::run(TranslationUnit *TU, Sema &S) {
   M = std::make_unique<llvm::Module>("top", Ctx);
 
+  /* Emit global variables */
+  for (ASTNode *N : TU->getNodes())
+    if (VariableDecl *Decl = llvm::dyn_cast<VariableDecl>(N)) {
+      M->getOrInsertGlobal(Decl->getId(), Decl->getType()->getLLVMType(Ctx));
+      llvm::GlobalVariable *V = M->getNamedGlobal(Decl->getId());
+      V->setInitializer(llvm::PoisonValue::get(Decl->getType()->getLLVMType(Ctx)));
+      V->setLinkage(llvm::GlobalValue::PrivateLinkage);
+      Decl->setAddr(V);
+    }
+
+  /* Emit all functions */
   for (TemplateInstance *Instance : S.getGlobalFunctions())
     emitTemplateInstance(Instance);
 
+  /* Create main() */
   llvm::FunctionType *MainFuncTy =
       llvm::FunctionType::get(Builder.getInt32Ty(), false);
   llvm::Function *MainFunc = llvm::Function::Create(
@@ -365,6 +376,14 @@ void Codegen::run(TranslationUnit *TU, Sema &S) {
   Builder.SetInsertPoint(EntryBB);
   llvm::FunctionCallee EntryFunc = M->getFunction(S.getEntryPoint()->getId());
   assert(EntryFunc && "no entry point");
+
+  /* Init global variables */
+  for (ASTNode *N : TU->getNodes())
+    if (VariableDecl *Decl = llvm::dyn_cast<VariableDecl>(N)) {
+      llvm::GlobalVariable *V = M->getNamedGlobal(Decl->getId());
+      Builder.CreateStore(emitAsRValue(Decl->getInitializer()), V);
+    }
+
   Builder.CreateCall(EntryFunc);
   Builder.CreateRet(Builder.getInt32(0));
 }
