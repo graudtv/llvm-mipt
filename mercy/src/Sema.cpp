@@ -225,9 +225,22 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
       return;
     }
     emitError(Callee, "type '" + TE->getValue()->toString() +
-              "' cannot be used as function name");
+                          "' cannot be used as function name");
   }
   if (Identifier *Id = llvm::dyn_cast<Identifier>(Callee)) {
+    if (Id->getName() == "array") {
+      if (!FC->getArgCount())
+        emitError(Callee, "array() requires at least one argument");
+      Type *ElemTy = ArgTys.front();
+      bool AllSame =
+          llvm::all_of(ArgTys, [ElemTy](Type *Ty) { return Ty == ElemTy; });
+      if (!AllSame) {
+        emitError(Callee,
+                  "arguments of different types in array() are not allowed");
+      }
+      FC->setType(ArrayType::get(ElemTy));
+      return;
+    }
     if (Id->getName() == "print") {
       FC->setType(BuiltinType::getVoidTy());
       return;
@@ -245,7 +258,24 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
   assert(0 && "not implemented: cannot handle call");
 }
 
-void Sema::actOnArraySubscriptExpr(ArraySubscriptExpr *Expr) {}
+void Sema::actOnArraySubscriptExpr(ArraySubscriptExpr *Expr) {
+  Expression *Arr = Expr->getArray();
+  Expression *Idx = Expr->getIndex();
+  Arr->sema(*this);
+  Idx->sema(*this);
+
+  if (!Arr->getType()->isArrayType()) {
+    emitError(Arr, "expression of type '" + Arr->getType()->toString() +
+                       "' is not an array");
+  }
+  if (!Idx->getType()->isBuiltinType() ||
+      !llvm::cast<BuiltinType>(Idx->getType())->isInteger()) {
+    emitError(Arr, "expression of type '" + Idx->getType()->toString() +
+                       "' cannot be used as index in array");
+  }
+  ArrayType *ArrTy = llvm::cast<ArrayType>(Arr->getType());
+  Expr->setType(ArrTy->getElemTy());
+}
 
 /* Insert declaration into the current scope */
 void Sema::actOnVariableDecl(VariableDecl *Decl) {

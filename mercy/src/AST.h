@@ -220,6 +220,7 @@ public:
 
   size_t size() const { return Nodes.size(); }
   ASTNode *getNode(size_t Idx) { return Nodes[Idx].get(); }
+  bool isEmpty() const { return Nodes.empty(); }
 
   template <class NodeT> NodeT *getNodeAs(size_t Idx) {
     return llvm::cast<NodeT>(Nodes[Idx].get());

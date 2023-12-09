@@ -151,9 +151,9 @@ prefix-expression
     : '!' postfix-expression { $$ = new UnaryOperator(UnaryOperator::NOT, $2); }
     | postfix-expression
 postfix-expression
-    : primary-expression '(' ')' { $$ = new FunctionCall($1); }
-    | primary-expression '(' expression-list ')' { $$ = new FunctionCall($1, $3); }
-    | primary-expression '[' expression ']' { $$ = new ArraySubscriptExpr($1, $3); }
+    : postfix-expression '(' ')' { $$ = new FunctionCall($1); }
+    | postfix-expression '(' expression-list ')' { $$ = new FunctionCall($1, $3); }
+    | postfix-expression '[' expression ']' { $$ = new ArraySubscriptExpr($1, $3); }
     | primary-expression
 primary-expression
     : identifier { $$ = new Identifier($1); free($1); }

@@ -90,6 +90,14 @@ void ArrayType::print(llvm::raw_ostream &Os) const {
   Os << "array_type(" << *ElementTy << ')';
 }
 
+llvm::Type *ArrayType::getLLVMType(llvm::LLVMContext &Ctx) const {
+  return ElementTy->getLLVMType(Ctx)->getPointerTo();
+}
+
 void MetaType::print(llvm::raw_ostream &Os) const {
   Os << "MetaType";
+}
+
+llvm::Type *MetaType::getLLVMType(llvm::LLVMContext &Ctx) const {
+  assert(0 && "not implemented");
 }

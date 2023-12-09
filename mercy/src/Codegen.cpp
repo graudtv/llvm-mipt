@@ -36,7 +36,6 @@ UNREACHABLE_NODE(FunctionDecl)
 UNREACHABLE_NODE(FunctionDomain)
 UNREACHABLE_NODE(TranslationUnit)
 
-
 namespace {
 
 void emitError(ASTNode *Node, const llvm::Twine &T) {
@@ -91,7 +90,8 @@ llvm::FunctionCallee Codegen::getOrInsertFunction(CallableFunction *F) {
   assert(0 && "extern not implemented");
 }
 
-llvm::FunctionCallee Codegen::getOrInsertInstanceDecl(TemplateInstance *Instance) {
+llvm::FunctionCallee
+Codegen::getOrInsertInstanceDecl(TemplateInstance *Instance) {
   if (llvm::Function *F = M->getFunction(Instance->getId()))
     return F;
 
@@ -261,21 +261,33 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
       return Builder.CreateIntCast(Arguments.front(), CastTy->getLLVMType(Ctx),
                                    CastTy->isSigned());
     }
-    // TODO: array constructor
     assert(0 && "unimplemented or illegal cast");
   }
-  assert(llvm::isa<Identifier>(Callee) && "indirect calls not implemented");
   // TODO: Id may be a function reference, not a function itself
+  assert(llvm::isa<Identifier>(Callee) && "indirect calls not implemented");
   auto &Id = llvm::cast<Identifier>(Callee)->getName();
+  if (Id == "array") {
+    assert(llvm::isa<ArrayType>(FC->getType()));
+    Type *ElemTy = llvm::cast<ArrayType>(FC->getType())->getElemTy();
+    assert(llvm::isa<BuiltinType>(ElemTy) &&
+           "arrays of non-builtin types are not implemented");
+    llvm::Type *LLVMElemTy = llvm::cast<BuiltinType>(ElemTy)->getLLVMType(Ctx);
+    llvm::Value *Arr = Builder.CreateAlloca(
+        LLVMElemTy, Builder.getInt32(Arguments.size()), "anon_array");
+
+    for (size_t I = 0; I < Arguments.size(); ++I) {
+      llvm::Value *Ptr = Builder.CreateConstInBoundsGEP1_32(
+          LLVMElemTy, Arr, I, "anon_array_elem_ptr");
+      Builder.CreateStore(Arguments[I], Ptr);
+    }
+
+    return Arr;
+  }
   if (Id == "print") {
-    if (FC->getArgCount() != 1)
-      emitError(FC, "invalid number of arguments in print() call");
+    assert(FC->getArgCount() == 1 && "invalid number of arguments in print()");
     Expression *Arg = FC->getArg(0);
     llvm::FunctionCallee PrintFunc;
     if (auto *BuiltinTy = llvm::dyn_cast<BuiltinType>(Arg->getType())) {
-      if (BuiltinTy->isVoid())
-        emitError(Callee, "cannot print void");
-      FC->setType(BuiltinType::getVoidTy());
       /* cast small integers to int32 / uint32 */
       if (BuiltinTy->isBool() || BuiltinTy->isInt8() || BuiltinTy->isInt16() ||
           BuiltinTy->isUint8() || BuiltinTy->isUint16()) {
@@ -287,31 +299,35 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
       emitError(Callee, "cannot print argument of non-builtin type");
     }
   }
-  return Builder.CreateCall(getOrInsertFunction(FC->getCalleeFunc()), Arguments);
+  return Builder.CreateCall(getOrInsertFunction(FC->getCalleeFunc()),
+                            Arguments);
 }
 
 llvm::Value *Codegen::emitArraySubscriptExpr(ArraySubscriptExpr *Expr) {
-  return nullptr;
+  llvm::Value *Arr = Expr->getArray()->codegen(*this);
+  llvm::Value *Idx = Expr->getIndex()->codegen(*this);
+
+  assert(llvm::isa<BuiltinType>(Expr->getType()) &&
+         "arrays of non-builtin types are not implemented");
+  llvm::Type *ElemTy =
+      llvm::cast<BuiltinType>(Expr->getType())->getLLVMType(Ctx);
+
+  llvm::Value *Ptr = Builder.CreateGEP(ElemTy, Arr, Idx, "elem_ptr");
+  return Builder.CreateLoad(ElemTy, Ptr, "elem");
 }
 
 llvm::Value *Codegen::emitVariableDecl(VariableDecl *Decl) {
   assert(!Decl->isRef() && "references not implemented");
-  assert(llvm::isa<BuiltinType>(Decl->getInitializer()->getType()) &&
-         "only builtin type decls are implemented");
-
-  BuiltinType *ExprTy =
-      llvm::cast<BuiltinType>(Decl->getInitializer()->getType());
-  Decl->setAddr(Builder.CreateAlloca(ExprTy->getLLVMType(Ctx)));
   llvm::Value *Initializer = Decl->getInitializer()->codegen(*this);
-  Builder.CreateStore(Initializer, Decl->getAddr());
+  llvm::Value *Addr =
+      Builder.CreateAlloca(Initializer->getType(), nullptr, Decl->getId());
+  Decl->setAddr(Addr);
+  Builder.CreateStore(Initializer, Addr);
   return nullptr;
 }
 
 llvm::Value *Codegen::emitIdentifier(Identifier *Id) {
-  assert(llvm::isa<BuiltinType>(Id->getType()) &&
-         "only builtin types are implemented");
-  BuiltinType *IdTy = llvm::cast<BuiltinType>(Id->getType());
-  return Builder.CreateLoad(IdTy->getLLVMType(Ctx),
+  return Builder.CreateLoad(Id->getType()->getLLVMType(Ctx),
                             Id->getDeclaration()->getAddr());
 }
 

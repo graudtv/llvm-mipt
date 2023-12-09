@@ -17,7 +17,13 @@ public:
   Type(TypeKind K) : TK(K) {}
   virtual ~Type() {}
   virtual void print(llvm::raw_ostream &Os) const = 0;
-  void print() const { print(llvm::outs()); }
+  void dump() const { print(llvm::outs()); }
+
+  /* Returns LLVM type which can be used for passing expression of this type.
+   * For BuiltinType, association is trivial
+   * For ArrayType, type is pointer on element */
+  virtual llvm::Type *getLLVMType(llvm::LLVMContext &Ctx) const = 0;
+
   std::string toString() const;
 
   TypeKind getKind() const { return TK; }
@@ -83,9 +89,8 @@ public:
   bool isUnsigned() const;
   bool isInteger() const { return isSigned() || isUnsigned(); }
 
-  llvm::Type *getLLVMType(llvm::LLVMContext &Ctx) const;
-
   void print(llvm::raw_ostream &Os) const override;
+  llvm::Type *getLLVMType(llvm::LLVMContext &Ctx) const override;
 
   static bool classof(const Type *T) { return T->isBuiltinType(); }
 };
@@ -101,6 +106,7 @@ public:
   Type *getElemTy() { return ElementTy; }
 
   void print(llvm::raw_ostream &Os) const override;
+  llvm::Type *getLLVMType(llvm::LLVMContext &Ctx) const override;
   static bool classof(const Type *T) { return T->isArrayType(); }
 };
 
@@ -113,6 +119,7 @@ public:
   static MetaType *get() { return &Instance; }
 
   void print(llvm::raw_ostream &Os) const override;
+  llvm::Type *getLLVMType(llvm::LLVMContext &Ctx) const override;
   static bool classof(const Type *T) { return T->isMetaType(); }
 };
 

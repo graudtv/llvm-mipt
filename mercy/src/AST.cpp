@@ -100,7 +100,7 @@ void Identifier::print(llvm::raw_ostream &Os, unsigned Shift) const {
 Identifier *Identifier::clone() const { return new Identifier(Name); }
 
 void NodeList::print(llvm::raw_ostream &Os, unsigned Shift) const {
-  Os << tabulate(Shift) << "NodeList\n";
+  Os << tabulate(Shift) << "NodeList" << (isEmpty() ? ": {}\n" : "\n");
   llvm::for_each(Nodes, [&Os, Shift](auto &&N) { N->print(Os, Shift + 1); });
 }
 
