@@ -287,8 +287,14 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
           LLVMElemTy, Arr, I, "anon_array_elem_ptr");
       Builder.CreateStore(Arguments[I], Ptr);
     }
-
     return Arr;
+  }
+  if (Id == "alloca") {
+    assert(llvm::isa<ArrayType>(FC->getType()));
+    Type *ElemTy = llvm::cast<ArrayType>(FC->getType())->getElemTy();
+    return Builder.CreateAlloca(ElemTy->getLLVMType(Ctx),
+                                Builder.getInt32(Arguments.size()),
+                                "anon_array");
   }
   if (Id == "print") {
     assert(FC->getArgCount() == 1 && "invalid number of arguments in print()");

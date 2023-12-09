@@ -27,8 +27,8 @@ VISIT_NODE(ReturnStmt)
 VISIT_NODE(TranslationUnit)
 
 SKIP_NODE(IntegralLiteral)
+SKIP_NODE(TypeExpr)
 
-UNREACHABLE_NODE(TypeExpr)
 UNREACHABLE_NODE(NodeList)
 UNREACHABLE_NODE(FunctionDecl)
 UNREACHABLE_NODE(FunctionDomain)
@@ -241,6 +241,16 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
         emitError(Callee,
                   "arguments of different types in array() are not allowed");
       }
+      FC->setType(ArrayType::get(ElemTy));
+      return;
+    }
+    if (Id->getName() == "alloca") {
+      if (FC->getArgCount() != 2)
+        emitError(Callee, "invalid number of arguments in alloca()");
+      assert(llvm::isa<TypeExpr>(FC->getArg(0)) && "indirect types are not implemented");
+      Type *ElemTy = llvm::cast<TypeExpr>(FC->getArg(0))->getValue();
+      if(!ElemTy->isBuiltinType() || ElemTy == BuiltinType::getVoidTy())
+        emitError(Callee, "illegal or not implemented array type");
       FC->setType(ArrayType::get(ElemTy));
       return;
     }
