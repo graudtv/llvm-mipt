@@ -575,9 +575,9 @@ prefix-expression
     : "!" postfix-expression
     | postfix-expression
 postfix-expression
-    : primary-expression "(" ")"
-    | primary-expression "(" expression-list ")"
-    | primary-expression "[" expression "]"
+    : postfix-expression "(" ")"
+    | postfix-expression "(" expression-list ")"
+    | postfix-expression "[" expression "]"
     | primary-expression
 primary-expression
     : identifier
