@@ -95,18 +95,13 @@ Codegen::getOrInsertInstanceDecl(TemplateInstance *Instance) {
   if (llvm::Function *F = M->getFunction(Instance->getId()))
     return F;
 
-  // TODO: Handle non-builtin return types
   FunctionDecl *FD = Instance->getDecl();
-  assert(llvm::isa<BuiltinType>(FD->getReturnType()));
-  BuiltinType *RetTy = llvm::cast<BuiltinType>(FD->getReturnType());
 
-  // TODO: Handle non-builtin parameter types
   std::vector<llvm::Type *> ParamTys;
-  llvm::transform(
-      FD->getParamTypes(), std::back_inserter(ParamTys),
-      [this](Type *T) { return llvm::cast<BuiltinType>(T)->getLLVMType(Ctx); });
-  llvm::FunctionType *FuncTy =
-      llvm::FunctionType::get(RetTy->getLLVMType(Ctx), ParamTys, false);
+  llvm::transform(FD->getParamTypes(), std::back_inserter(ParamTys),
+                  [this](Type *T) { return T->getLLVMType(Ctx); });
+  llvm::FunctionType *FuncTy = llvm::FunctionType::get(
+      FD->getReturnType()->getLLVMType(Ctx), ParamTys, false);
   return M->getOrInsertFunction(Instance->getId(), FuncTy);
 }
 
@@ -123,10 +118,7 @@ void Codegen::emitTemplateInstance(TemplateInstance *Instance) {
   for (size_t I = 0; I < FrontFragment->getParamCount(); ++I) {
     FuncParamDecl *Param = FrontFragment->getParam(I);
     Func->getArg(I)->setName(Param->getId());
-    assert(llvm::isa<BuiltinType>(Param->getType()) &&
-           "only builtin types implemented");
-    llvm::Type *Ty =
-        llvm::cast<BuiltinType>(Param->getType())->getLLVMType(Ctx);
+    llvm::Type *Ty = Param->getType()->getLLVMType(Ctx);
     Param->setAddr(Builder.CreateAlloca(Ty, nullptr, Param->getId() + ".copy"));
     Builder.CreateStore(Func->getArg(I), Param->getAddr());
   }
