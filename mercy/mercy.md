@@ -12,14 +12,18 @@ Main features:
 - [Syntax and semantics overview](#syntax-and-semantics-overview)
     + [Translation Unit](#translation-unit)
     + [Declaration](#declaration)
-    + [Expression](#expression)
-    + [Type expression](#type-expression)
+    + [Type System](#type-system)
     + [Builtin type](#builtin-type)
-    + [Function type expression](#function-type-expression)
-    + [Array type expression](#array-type-expression)
-    + [Block expression](#block-expression)
-    + [Extern expression](#extern-expression)
-    + [Constructors](#constructors)
+    + [Expression](#expression)
+    + [Type casts](#type-casts)
+- [Builtin Functions](#builtin-functions)
+    + [function_type() function](#function_type-function)
+    + [extern() function](#extern-function)
+    + [array() function](#extern-function)
+    + [alloca() function](#alloca-function)
+- [Other semantical concepts](#other-semantical-concpets)
+    + [Compile-time expressions](#compile-time-expressions)
+    + [ODR and scope](#odr-and-scope)
     + [Memory management](#memory-management)
 - [Full grammar](#full-grammar)
     + [Lexer grammar](#lexer-grammar)
@@ -240,8 +244,12 @@ meaning is the same as in C, however not all C operators are supported.
 
 Examples of _expression_-s:
 ```
-let x = a + b; // a + b is expression
-func(x, 2 + 2 * 2); // x, 2, 2 * 2, 2 + 2 * 2, func(x, 2 + 2 * 2) are expressions
+let x = a + b; // 'a + b' is expression
+func(x, 2 + 2 * 2); // 'x', '2', '2 * 2', '2 + 2 * 2', 'func(x, 2 + 2 * 2)' are expressions
+
+let set_elem(arr, idx, val) {
+  arr[idx] = val; // 'arr', 'idx', 'arr[idx]', 'val', 'arr[idx] = val' are expressions
+}
 ```
 
 Operators have the following restrictions and semantics:
@@ -251,11 +259,11 @@ Operators have the following restrictions and semantics:
   The result has _bool_ type. Depending on whether the type is signed or
   unsigned, signed or unsigned comparison is performed
 * Operands of '==', '!=' must be _Value_-s of the same integer type. The
-  result has _bool_ type.
+  result has _bool_ type
 * Operands of '&', '^', '|' must be _Value_-s of the same unsigned integer
-  type. The result has the same type as operands.
+  type. The result has the same type as operands
 * Operands of '*', '+', '-', '<<' must be _Value_-s of the same integer type.
-  The result has the same type.
+  The result has the same type
 * Operands of '/', '%', '>>' must be _Value_-s of the same integer type. The
   result has the same type. Depending on whether the type is signed or
   unsigned, signed or unsigned operation is performed (signed division vs
@@ -264,12 +272,17 @@ Operators have the following restrictions and semantics:
 * LHS operand of '()' must be either compile-time _Value_ of function type or
   builtin _Type_. The latter performs a type cast, see [type-cast](#type-cast).
 * LHS Operand of '[]' must be _Value_ of some array type. Operand inside
-  brackets must be _Value_ of integer type.
+  brackets must be _Value_ of integer type
+* LHS operand of '=' must be modifiable. Both operands must be
+  _Generic Value_-s of the same _Generic Type_
 
 _Grammar Synopsis_:
 ```
 expression
-    : logical-or-expression
+    : assignment-expression
+assignment-expression
+    : postfix-expression "=" assignment-expression
+    | logical-or-expression
 logical-or-expression
     : logical-or-expression "||" logical-and-expression
     | logical-and-expression
@@ -328,8 +341,9 @@ expression-list
 ```
 
 ##### Type casts
-Compile-time builtin _Type_ can be used as a function name to construct a type
-from another integer type, i.e. perform a type cast:
+Compile-time expression which produces integer _Type_ can be used as a function
+name to construct that type from another integer type, i.e. perform a type
+cast:
 
 ```
 let x = 10;              // x is int
@@ -391,11 +405,11 @@ the symbol, behaviour is undefined.
 ##### _array()_ function
 _Synopsis_: ```let array(values...) = <array>;```
 
-_array()_ creates an array of supplied values. All values must be
+_array()_ creates an array of one or more supplied values. All values must be
 _Generic Value_-s of the same type.
 
 ##### _alloca()_ function
-_Synopsis: ```let alloca(type, size) = <array>;```
+_Synopsis_: ```let alloca(type, size) = <array>;```
 
 * When used in global scope, _alloca()_ creates a global array. _size_ must be
   compile-time non-negative _Value_ of integer type. _type_ must be
@@ -532,7 +546,10 @@ optional-domain
     | %empty
 
 expression
-    : logical-or-expression
+    : assignment-expression
+assignment-expression
+    : postfix-expression "=" assignment-expression
+    | logical-or-expression
 logical-or-expression
     : logical-or-expression "||" logical-and-expression
     | logical-and-expression
