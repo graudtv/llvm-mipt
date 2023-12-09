@@ -196,3 +196,12 @@ void ReturnStmt::print(llvm::raw_ostream &Os, unsigned Shift) const {
 ReturnStmt *ReturnStmt::clone() const {
   return new ReturnStmt(Expr->clone());
 }
+
+void TranslationUnit::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "TranslationUnit\n";
+  Decls->print(Os, Shift + 1);
+}
+
+TranslationUnit *TranslationUnit::clone() const {
+  return new TranslationUnit(Decls->clone());
+}

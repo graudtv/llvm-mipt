@@ -15,7 +15,7 @@ void yyerror(const char* s);
 
 using namespace mercy;
 
-static std::unique_ptr<ASTNode> ParserResult;
+static std::unique_ptr<TranslationUnit> ParserResult;
 
 %}
 
@@ -61,6 +61,7 @@ static std::unique_ptr<ASTNode> ParserResult;
   builtin-type
 
 %nterm<mercy::NodeList *>
+  declaration-list
   statement-list
   expression-list
   optional-function-parameter-list
@@ -73,10 +74,12 @@ static std::unique_ptr<ASTNode> ParserResult;
 %%
 
 program: translation-unit
-
 translation-unit
-    : statement-list { ParserResult = std::unique_ptr<ASTNode>($1); }
-    | %empty { ParserResult = std::make_unique<NodeList>(); }
+    : declaration-list { ParserResult = std::make_unique<TranslationUnit>($1); }
+    | %empty { ParserResult = std::make_unique<TranslationUnit>(); }
+declaration-list
+    : declaration-list declaration { $1->append($2); $$ = $1; }
+    | declaration { $$ = new NodeList($1); }
 
 declaration
     : let identifier '=' expression ';' { $$ = new VariableDecl($2, $4, /*IsRef=*/ false); free($2); }
@@ -181,7 +184,7 @@ void yyerror(const char *err) {
   exit(1);
 }
 
-std::unique_ptr<ASTNode> mercy::parse(FILE *In) {
+std::unique_ptr<TranslationUnit> mercy::parse(FILE *In) {
   yyin = In;
   if (yyparse() != 0) {
     llvm::errs() << "Unknown parser error\n";

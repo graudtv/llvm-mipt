@@ -15,6 +15,7 @@ public:
   Scope(Scope *PrevScope = nullptr, std::string ScopeName = {})
       : Prev(PrevScope), Name(std::move(ScopeName)) {}
 
+  bool isGlobal() const { return !Prev; }
   Scope *getPrev() { return Prev; }
   const std::string &getName() { return Name; }
 
@@ -44,6 +45,7 @@ class Sema {
   std::vector<std::unique_ptr<FunctionDecl>> FunctionDecls;
   /* Storage for all emitted function instantiations */
   std::vector<TemplateInstance *> AllInstances;
+  TemplateInstance *EntryPoint = nullptr;
 
   Declaration *findDecl(const std::string &Id);
   void insertDecl(Declaration *Decl);
@@ -53,6 +55,7 @@ class Sema {
                               llvm::ArrayRef<Type *> ParamTys);
 
   void actOnFunctionBody(FunctionFragment *Func);
+  void createEntryPoint();
 
 public:
   void actOnBinaryOperator(BinaryOperator *BinOp);
@@ -63,10 +66,12 @@ public:
   void actOnFuncParamDecl(FuncParamDecl *Decl);
   void actOnIdentifier(Identifier *Id);
   void actOnReturnStmt(ReturnStmt *Ret);
+  void actOnTranslationUnit(TranslationUnit *TU);
 
-  void run(ASTNode *TU);
+  void run(TranslationUnit *TU);
 
   const auto &getGlobalFunctions() { return AllInstances; }
+  TemplateInstance *getEntryPoint() { return EntryPoint; }
 };
 
 } // namespace mercy

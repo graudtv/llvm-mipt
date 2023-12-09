@@ -20,6 +20,7 @@ class Codegen {
 
   llvm::FunctionCallee getOrInsertFunction(CallableFunction *F);
   llvm::FunctionCallee getOrInsertInstanceDecl(TemplateInstance *Instance);
+  void emitTemplateInstance(TemplateInstance *Instance);
 
 public:
   Codegen();
@@ -32,9 +33,7 @@ public:
   llvm::Value *emitIdentifier(Identifier *Id);
   llvm::Value *emitReturnStmt(ReturnStmt *Ret);
 
-  void emitTemplateInstance(TemplateInstance *Instance);
-
-  void run(ASTNode *AST, Sema &S);
+  void run(TranslationUnit *TU, Sema &S);
 
   /* Note that Module is binded to LLVMContext, i.e. Codegen must be alive
    * while returned module is used */

@@ -23,6 +23,7 @@ VISIT_NODE(FunctionFragment)
 VISIT_NODE(FuncParamDecl)
 VISIT_NODE(Identifier)
 VISIT_NODE(ReturnStmt)
+VISIT_NODE(TranslationUnit)
 
 SKIP_NODE(IntegralLiteral)
 
@@ -32,13 +33,12 @@ UNREACHABLE_NODE(FunctionDecl)
 UNREACHABLE_NODE(FunctionDomain)
 
 namespace {
-void emitError(ASTNode *Node, const llvm::Twine &T) {
-  llvm::errs() << "line " << Node->getLocation().LineNo << ": " << T << '\n';
+void emitError(const llvm::Twine &T) {
+  llvm::errs() << "error: "<< T << '\n';
   exit(1);
 }
-void emitWarning(ASTNode *Node, const llvm::Twine &T) {
-  llvm::errs() << "line " << Node->getLocation().LineNo << ": warning: " << T
-               << '\n';
+void emitError(ASTNode *Node, const llvm::Twine &T) {
+  llvm::errs() << "line " << Node->getLocation().LineNo << ": " << T << '\n';
   exit(1);
 }
 
@@ -85,7 +85,8 @@ Sema::getOrCreateFunctionInstance(FunctionDecl *FD,
   if (It != Instances.end()) {
     TemplateInstance *Ins = *It;
     if (!Ins->getDecl()->getReturnType())
-      emitError(Ins->getDecl(), "failed to deduce template function return type");
+      emitError(Ins->getDecl(),
+                "failed to deduce template function return type");
     return Ins;
   }
 
@@ -278,11 +279,24 @@ void Sema::actOnIdentifier(Identifier *Id) {
 
 void Sema::actOnReturnStmt(ReturnStmt *Ret) { Ret->getRetExpr()->sema(*this); }
 
-void Sema::run(ASTNode *TU) {
+void Sema::createEntryPoint() {
+  auto It = llvm::find_if(FunctionDecls, [this](auto &&FD) {
+    return FD->getId() == "main" && CurScope->contains(FD.get());
+  });
+  if (It == FunctionDecls.end())
+    emitError("no main() function");
+  // TODO: validate main() signature
+  EntryPoint = getOrCreateFunctionInstance(It->get(), {});
+}
+
+void Sema::actOnTranslationUnit(TranslationUnit *TU) {
+  llvm::for_each(TU->getNodes(), [this](auto &&N) { N->sema(*this); });
+}
+
+void Sema::run(TranslationUnit *TU) {
   Scope GlobalScope;
   CurScope = &GlobalScope;
-  auto Statements = llvm::cast<NodeList>(TU)->getNodes();
-  for (auto S : Statements)
-    S->sema(*this);
+  TU->sema(*this);
+  createEntryPoint();
   assert(CurScope && !CurScope->getPrev() && "bug in scope handling");
 }

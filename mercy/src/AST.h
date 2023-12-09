@@ -41,7 +41,8 @@ public:
     NK_FunctionFragment,
     NK_FunctionDecl,
     NK_BuiltinTypeExpr,
-    NK_ReturnStmt
+    NK_ReturnStmt,
+    NK_TranslationUnit
   };
 
 private:
@@ -53,7 +54,7 @@ public:
   virtual ~ASTNode() {}
 
   NodeKind getNodeKind() const { return NK; }
-  virtual void print(llvm::raw_ostream &Os, unsigned Shift) const = 0;
+  virtual void print(llvm::raw_ostream &Os, unsigned Shift = 0) const = 0;
   virtual llvm::Value *codegen(Codegen &Gen) = 0;
   virtual void sema(Sema &S) = 0;
   virtual ASTNode *clone() const = 0;
@@ -61,7 +62,7 @@ public:
   void setLocation(Location L) { Loc = L; }
   Location getLocation() const { return Loc; }
 
-  void print(llvm::raw_ostream &Os = llvm::outs()) const { print(Os, 0); }
+  void dump() const { print(llvm::outs()); }
 };
 
 /* Base class for all nodes that have a type.
@@ -93,7 +94,7 @@ public:
 
   int getValue() const { return Value; }
 
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   IntegralLiteral *clone() const override;
@@ -128,7 +129,7 @@ public:
 
   const char *getMnemonic() const;
 
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   BinaryOperator *clone() const override;
@@ -153,7 +154,7 @@ public:
   Expression *getExpr() { return Expr.get(); }
   UnaryOpKind getKind() const { return Kind; }
 
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   UnaryOperator *clone() const override;
@@ -176,7 +177,7 @@ public:
   void setDeclaration(Declaration *D) { Decl = D; }
   Declaration *getDeclaration() { return Decl; }
 
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   Identifier *clone() const override;
@@ -209,7 +210,7 @@ public:
   }
   auto getNodes() { return getNodesAs<ASTNode>(); }
 
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   NodeList *clone() const override;
@@ -257,7 +258,7 @@ public:
   Expression *getInitializer() { return Init.get(); }
   const Expression *getInitializer() const { return Init.get(); }
 
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   VariableDecl *clone() const override;
@@ -283,7 +284,7 @@ public:
   void setType(Type *T) { ParamTy = T; }
   Type *getType() override { return ParamTy; }
 
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   FuncParamDecl *clone() const override;
@@ -300,14 +301,20 @@ private:
   enum DomainKind { Global, Custom, Otherwise } DK;
 
 public:
-  FunctionDomain(Expression *E) : ASTNode(NK_FunctionDomain), Expr(E), DK(Custom) {}
-  FunctionDomain(bool IsGlobal) : ASTNode(NK_FunctionDomain), Expr(nullptr), DK(IsGlobal ? Global : Otherwise) {}
+  FunctionDomain(Expression *E)
+      : ASTNode(NK_FunctionDomain), Expr(E), DK(Custom) {}
+  FunctionDomain(bool IsGlobal)
+      : ASTNode(NK_FunctionDomain), Expr(nullptr),
+        DK(IsGlobal ? Global : Otherwise) {}
   bool isGlobal() const { return DK == Global; }
   bool isCustom() const { return DK == Custom; }
   bool isOtherwise() const { return DK == Otherwise; }
-  Expression *getExpr() { assert(isCustom()); return Expr.get(); }
+  Expression *getExpr() {
+    assert(isCustom());
+    return Expr.get();
+  }
 
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   FunctionDomain *clone() const override;
@@ -355,7 +362,7 @@ public:
                            [](FuncParamDecl *Decl) { return Decl->getType(); });
   }
 
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   FunctionFragment *clone() const override;
@@ -387,7 +394,7 @@ public:
   Type *getReturnType() { return Fragments.front()->getReturnType(); }
   auto getParamTypes() { return Fragments.front()->getParamTypes(); }
 
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   FunctionDecl *clone() const override;
@@ -421,7 +428,7 @@ public:
   void setCalleeFunc(CallableFunction *F) { CalleeFunc = F; }
   CallableFunction *getCalleeFunc() { return CalleeFunc; }
 
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   FunctionCall *clone() const override;
@@ -441,7 +448,7 @@ public:
         llvm::cast<MetaType>(getType())->getReferencedType());
   }
 
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   BuiltinTypeExpr *clone() const override;
@@ -453,19 +460,39 @@ public:
 
 class ReturnStmt : public ASTNode {
   std::unique_ptr<Expression> Expr;
+
 public:
   ReturnStmt(Expression *E) : ASTNode(NK_ReturnStmt), Expr(E) {}
 
   Expression *getRetExpr() { return Expr.get(); }
   Type *getRetType() { return Expr->getType(); }
 
-  void print(llvm::raw_ostream &Os, unsigned Shift) const override;
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   ReturnStmt *clone() const override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_ReturnStmt;
+  }
+};
+
+class TranslationUnit : public ASTNode {
+  std::unique_ptr<NodeList> Decls;
+
+public:
+  TranslationUnit(NodeList *D) : ASTNode(NK_TranslationUnit), Decls(D) {}
+  TranslationUnit() : TranslationUnit(new NodeList) {}
+
+  auto getNodes() { return Decls->getNodes(); }
+
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
+  llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
+  TranslationUnit *clone() const override;
+
+  static bool classof(const ASTNode *N) {
+    return N->getNodeKind() == NK_BuiltinTypeExpr;
   }
 };
 

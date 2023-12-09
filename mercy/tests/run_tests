@@ -24,7 +24,7 @@ sub test_case {
 my @tests = glob(dirname($0) . "/test_*");
 for my $test (@tests) {
   $prefix = basename $test;
-  do $test or die "failed to run tests";
+  do $test or die "failed to run tests: $@";
 }
 
 exit($err_count ? 1 : 0);
