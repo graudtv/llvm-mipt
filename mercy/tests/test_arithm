@@ -275,3 +275,12 @@ test_case(name => "multiassignment", source => <<"END",
 END
   expect => "100\n100\n100"
 );
+
+test_case(name => "string", source => <<"END",
+  let main() {
+    let str = "Hello, world!";
+    print(str);
+  };
+END
+  expect => "Hello, world!"
+);

@@ -27,6 +27,7 @@ VISIT_NODE(ReturnStmt)
 VISIT_NODE(TranslationUnit)
 
 SKIP_NODE(IntegralLiteral)
+SKIP_NODE(StringLiteral)
 SKIP_NODE(TypeExpr)
 
 UNREACHABLE_NODE(NodeList)
@@ -253,6 +254,15 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
         emitError(Callee, "illegal or not implemented array type");
       FC->setType(ArrayType::get(ElemTy));
       return;
+    }
+    if (Id->getName() == "extern") {
+      if (FC->getArgCount() != 2)
+        emitError(Callee, "invalid number of arguments in alloca()");
+      if (!llvm::isa<TypeExpr>(FC->getArg(0)))
+        emitError(FC->getArg(0), "return type must be constexpr");
+      if (!llvm::isa<TypeExpr>(FC->getArg(1)))
+        emitError(FC->getArg(1), "symbol type must be constexpr");
+
     }
     if (Id->getName() == "print") {
       FC->setType(BuiltinType::getVoidTy());

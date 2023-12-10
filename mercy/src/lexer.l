@@ -21,6 +21,9 @@ class FunctionDomain;
 0[0-9]+         {yylval.TK_inum = strtol(yytext, nullptr, 8); return TK_inum; }
 [-]?[0-9]+      {yylval.TK_inum = atoi(yytext); return TK_inum; }
 
+  /* string literal */
+["].*["]         { yylval.TK_str = strndup(yytext + 1, strlen(yytext) - 2); return TK_str; }
+
   /* multicharacter operators */
 "||"              { return TK_LOR; }
 "&&"              { return TK_LAND; }

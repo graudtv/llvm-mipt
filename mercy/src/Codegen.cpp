@@ -19,6 +19,7 @@ using namespace mercy;
   }
 
 VISIT_NODE(IntegralLiteral)
+VISIT_NODE(StringLiteral)
 VISIT_NODE(BinaryOperator)
 VISIT_NODE(UnaryOperator)
 VISIT_NODE(FunctionCall)
@@ -81,6 +82,8 @@ llvm::FunctionCallee Codegen::getOrInsertPrintFunc(BuiltinType *Ty) {
     return getOrInsertPrintFunc(Builder.getInt64Ty(), "i64", "%ld\n");
   if (Ty->isUint64())
     return getOrInsertPrintFunc(Builder.getInt64Ty(), "u64", "%lu\n");
+  if (Ty->isString())
+    return getOrInsertPrintFunc(Ty->getLLVMType(Ctx), "str", "%s\n");
   llvm_unreachable("unhandled builtin type");
 }
 
@@ -185,6 +188,10 @@ Codegen::Codegen() : Ctx(), Builder(Ctx) {
 
 llvm::Value *Codegen::emitIntegralLiteral(IntegralLiteral *IL) {
   return Builder.getInt32(IL->getValue());
+}
+
+llvm::Value *Codegen::emitStringLiteral(StringLiteral *Str) {
+  return Builder.CreateGlobalStringPtr(Str->getValue());
 }
 
 llvm::Value *Codegen::emitBinaryOperator(BinaryOperator *BinOp) {

@@ -47,7 +47,8 @@ public:
     Uint8,
     Uint16,
     Uint32,
-    Uint64
+    Uint64,
+    String
   };
 
 private:
@@ -58,6 +59,7 @@ private:
   static BuiltinType BoolTy;
   static BuiltinType Int8Ty, Int16Ty, Int32Ty, Int64Ty;
   static BuiltinType Uint8Ty, Uint16Ty, Uint32Ty, Uint64Ty;
+  static BuiltinType StringTy;
 
 public:
   static BuiltinType *getVoidTy() { return &VoidTy; }
@@ -70,6 +72,7 @@ public:
   static BuiltinType *getUint16Ty() { return &Uint16Ty; }
   static BuiltinType *getUint32Ty() { return &Uint32Ty; }
   static BuiltinType *getUint64Ty() { return &Uint64Ty; }
+  static BuiltinType *getStringTy() { return &StringTy; }
 
   /* Type aliases */
   static BuiltinType *getIntTy() { return getInt32Ty(); }
@@ -85,6 +88,7 @@ public:
   bool isUint16() const { return BK == Uint16; }
   bool isUint32() const { return BK == Uint32; }
   bool isUint64() const { return BK == Uint64; }
+  bool isString() const { return BK == String; }
 
   bool isSigned() const;
   bool isUnsigned() const;

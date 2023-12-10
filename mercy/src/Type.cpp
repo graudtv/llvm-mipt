@@ -35,6 +35,7 @@ BuiltinType BuiltinType::Uint8Ty{BuiltinType::Uint8};
 BuiltinType BuiltinType::Uint16Ty{BuiltinType::Uint16};
 BuiltinType BuiltinType::Uint32Ty{BuiltinType::Uint32};
 BuiltinType BuiltinType::Uint64Ty{BuiltinType::Uint64};
+BuiltinType BuiltinType::StringTy{BuiltinType::String};
 std::unordered_map<Type *, ArrayType> ArrayType::ArrayTypes;
 std::list<FunctionType> FunctionType::FuncTypes;
 MetaType MetaType::Instance{};
@@ -72,6 +73,8 @@ llvm::Type *BuiltinType::getLLVMType(llvm::LLVMContext &Ctx) const {
   case Int64:
   case Uint64:
     return llvm::Type::getInt64Ty(Ctx);
+  case String:
+    return llvm::Type::getInt8Ty(Ctx)->getPointerTo();
   }
   llvm_unreachable("unhandled type");
 }

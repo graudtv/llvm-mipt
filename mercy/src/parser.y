@@ -25,6 +25,7 @@ static std::unique_ptr<TranslationUnit> ParserResult;
 
 %token<int> inum "integer";
 %token<char *> identifier "identifier";
+%token<char *> str "string literal";
 %token LOR "||";
 %token LAND "&&";
 %token EQ "==";
@@ -59,6 +60,8 @@ static std::unique_ptr<TranslationUnit> ParserResult;
   prefix-expression
   postfix-expression
   primary-expression
+  numeric-literal
+  string-literal
   builtin-type
 
 %nterm<mercy::NodeList *>
@@ -161,12 +164,16 @@ postfix-expression
     | primary-expression
 primary-expression
     : identifier { $$ = new Identifier($1); free($1); }
-    | inum { $$ = new IntegralLiteral($1); }
+    | numeric-literal
+    | string-literal
     | '(' expression ')' { $$ = $2; }
     | builtin-type
 expression-list
     : expression-list ',' expression { $1->append($3); $$ = $1; }
     | expression { $$ = new NodeList($1); }
+
+numeric-literal: inum { $$ = new IntegralLiteral($1); }
+string-literal: str { $$ = new StringLiteral($1); free($1); }
 
 builtin-type
     : void { $$ = new TypeExpr(BuiltinType::getVoidTy()); }

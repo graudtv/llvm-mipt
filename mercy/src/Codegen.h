@@ -26,6 +26,7 @@ class Codegen {
 public:
   Codegen();
   llvm::Value *emitIntegralLiteral(IntegralLiteral *IL);
+  llvm::Value *emitStringLiteral(StringLiteral *Str);
   llvm::Value *emitBinaryOperator(BinaryOperator *BinOp);
   llvm::Value *emitUnaryOperator(UnaryOperator *Op);
   llvm::Value *emitFunctionCall(FunctionCall *FC);

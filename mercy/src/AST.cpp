@@ -66,6 +66,14 @@ IntegralLiteral *IntegralLiteral::clone() const {
   return new IntegralLiteral(Value);
 }
 
+void StringLiteral::print(llvm::raw_ostream &Os, unsigned Shift) const {
+  Os << tabulate(Shift) << "StringLiteral '" << Value << "'\n";
+}
+
+StringLiteral *StringLiteral::clone() const {
+  return new StringLiteral(Value);
+}
+
 void TypeExpr::print(llvm::raw_ostream &Os, unsigned Shift) const {
   Os << tabulate(Shift) << "TypeExpr '" << *GValue << "'\n";
 }

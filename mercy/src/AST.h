@@ -30,6 +30,7 @@ class ASTNode : private NonCopyable {
 public:
   enum NodeKind {
     NK_IntegralLiteral,
+    NK_StringLiteral,
     NK_TypeExpr,
     NK_BinaryOperator,
     NK_UnaryOperator,
@@ -82,10 +83,10 @@ public:
 
   static bool classof(const ASTNode *N) {
     NodeKind NK = N->getNodeKind();
-    return NK == NK_IntegralLiteral || NK == NK_TypeExpr ||
-           NK == NK_BinaryOperator || NK == NK_UnaryOperator ||
-           NK == NK_Identifier || NK == NK_FunctionCall ||
-           NK == NK_ArraySubscriptExpr;
+    return NK == NK_IntegralLiteral || NK == NK_StringLiteral ||
+           NK == NK_TypeExpr || NK == NK_BinaryOperator ||
+           NK == NK_UnaryOperator || NK == NK_Identifier ||
+           NK == NK_FunctionCall || NK == NK_ArraySubscriptExpr;
   }
 };
 
@@ -108,12 +109,30 @@ public:
   }
 };
 
+class StringLiteral : public Expression {
+  std::string Value;
+
+public:
+  StringLiteral(const std::string &S)
+      : Expression(NK_StringLiteral, BuiltinType::getStringTy()), Value(S) {}
+
+  const std::string &getValue() { return Value; }
+
+  void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
+  llvm::Value *codegen(Codegen &Gen) override;
+  void sema(Sema &S) override;
+  StringLiteral *clone() const override;
+
+  static bool classof(const ASTNode *N) {
+    return N->getNodeKind() == NK_StringLiteral;
+  }
+};
+
 class TypeExpr : public Expression {
   Type *GValue;
 
 public:
-  TypeExpr(Type *Ty)
-      : Expression(NK_TypeExpr, MetaType::get()), GValue(Ty) {}
+  TypeExpr(Type *Ty) : Expression(NK_TypeExpr, MetaType::get()), GValue(Ty) {}
 
   Type *getValue() const { return GValue; }
 
