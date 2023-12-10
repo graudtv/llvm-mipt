@@ -1,0 +1,25 @@
+test_case(name => "local_usage", source => <<"END",
+  let main() {
+    let x = extern("g_int", int);
+    let y = extern("g_short", int16);
+    print(x);
+    print(y);
+  };
+END
+  csource => "int g_int = 1234; short g_short = 111;",
+  expect => "1234\n111"
+);
+
+test_case(name => "global_usage", source => <<"END",
+  let x = extern("g_int", int);
+  let y = extern("g_short", int16);
+
+  let main() {
+    print(x);
+    print(y);
+  };
+END
+  csource => "int g_int = 1234; short g_short = 111;",
+  expect => "1234\n111"
+);
+

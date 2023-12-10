@@ -47,6 +47,7 @@ uint8           { return TK_uint8; }
 uint16          { return TK_uint16; }
 uint32          { return TK_uint32; }
 uint64          { return TK_uint64; }
+string          { return TK_string; }
 
   /* Other keywords */
 let             { return TK_let; }

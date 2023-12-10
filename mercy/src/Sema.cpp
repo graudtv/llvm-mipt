@@ -258,11 +258,13 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
     if (Id->getName() == "extern") {
       if (FC->getArgCount() != 2)
         emitError(Callee, "invalid number of arguments in alloca()");
-      if (!llvm::isa<TypeExpr>(FC->getArg(0)))
-        emitError(FC->getArg(0), "return type must be constexpr");
+      if (!llvm::isa<StringLiteral>(FC->getArg(0)))
+        emitError(FC->getArg(0), "symbol name must be constexpr string");
       if (!llvm::isa<TypeExpr>(FC->getArg(1)))
-        emitError(FC->getArg(1), "symbol type must be constexpr");
-
+        emitError(FC->getArg(1), "invalid symbol type");
+      Type *SymbolType = llvm::cast<TypeExpr>(FC->getArg(1))->getValue();
+      FC->setType(SymbolType);
+      return;
     }
     if (Id->getName() == "print") {
       FC->setType(BuiltinType::getVoidTy());

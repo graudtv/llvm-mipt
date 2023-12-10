@@ -302,6 +302,12 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
     return Builder.CreateAlloca(ElemTy->getLLVMType(Ctx), Arguments[1],
                                 "anon_array");
   }
+  if (Id == "extern") {
+    auto &SymbolName = llvm::cast<StringLiteral>(FC->getArg(0))->getValue();
+    llvm::Type *SymbolType = FC->getType()->getLLVMType(Ctx);
+    llvm::Value *Addr = M->getOrInsertGlobal(SymbolName, SymbolType);
+    return Builder.CreateLoad(SymbolType, Addr, SymbolName);
+  }
   if (Id == "print") {
     assert(FC->getArgCount() == 1 && "invalid number of arguments in print()");
     Expression *Arg = FC->getArg(0);

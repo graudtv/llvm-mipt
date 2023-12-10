@@ -1,0 +1,103 @@
+test_case(name => "simple", source => <<"END",
+  let main() {
+    print(array(10, 20, 30)[1]);
+  };
+END
+  expect => "20"
+);
+
+test_case(name => "subscript", source => <<"END",
+  let main() {
+    let arr = array(10, 20, 30);
+    print(arr[0]);
+    print(arr[1]);
+    print(arr[2]);
+  };
+END
+  expect => "10\n20\n30"
+);
+
+test_case(name => "complex_init", source => <<"END",
+  let square(x) = x * x;
+  let main() {
+    let arr = array(square(10), square(20), square(3) + square(4));
+    print(arr[0]);
+    print(arr[1]);
+    print(arr[2]);
+  };
+END
+  expect => "100\n400\n25"
+);
+
+test_case(name => "assign_elem", source => <<"END",
+  let main() {
+    let x = array(10, 20, 30);
+    x[1] = 1000;
+    print(x[0]);
+    print(x[1]);
+    print(x[2]);
+  };
+END
+  expect => "10\n1000\n30"
+);
+
+test_case(name => "assign_arr", source => <<"END",
+  let main() {
+    let x = array(10, 20, 30);
+    let y = x;
+    x[1] = 1000;
+    print(y[0]);
+    print(y[1]);
+    print(y[2]);
+  };
+END
+  expect => "10\n1000\n30"
+);
+
+test_case(name => "array_as_arg", source => <<"END",
+  let set_elem(arr, idx, value) { arr[idx] = value; };
+  let print_elem(arr, idx) { print(arr[idx]); };
+
+  let main() {
+    let x = array(10, 20, 30);
+    set_elem(x, 1, 1000);
+    print_elem(x, 0);
+    print_elem(x, 1);
+    print_elem(x, 2);
+  };
+END
+  expect => "10\n1000\n30"
+);
+
+test_case(name => "alloca", source => <<"END",
+  let main() {
+    let sz = 100;
+    let x = alloca(int, sz);
+    x[0] = 111;
+    x[99] = 222;
+    print(x[0]);
+    print(x[99]);
+  };
+END
+  expect => "111\n222"
+);
+
+test_case(name => "globals", source => <<"END",
+  let x = 55;
+  let y = 77;
+  let arr = alloca(int, 100);
+  let vals = array(10, 20, 30);
+
+  let main() {
+    arr[0] = x;
+    arr[10] = y;
+
+    print(arr[0]);
+    print(arr[10]);
+    print(vals[0]);
+    print(vals[1]);
+    print(vals[2]);
+  };
+END
+  expect => "55\n77\n10\n20\n30"
+);

@@ -35,7 +35,7 @@ static std::unique_ptr<TranslationUnit> ParserResult;
 %token LSHIFT "<<";
 %token RSHIFT ">>";
 
-%token void bool int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64;
+%token void bool int int8 int16 int32 int64 uint uint8 uint16 uint32 uint64 string;
 %token let return when otherwise
 
 %token ',' "comma";
@@ -188,6 +188,7 @@ builtin-type
     | uint16 { $$ = new TypeExpr(BuiltinType::getUint16Ty()); }
     | uint32 { $$ = new TypeExpr(BuiltinType::getUint32Ty()); }
     | uint64 { $$ = new TypeExpr(BuiltinType::getUint64Ty()); }
+    | string { $$ = new TypeExpr(BuiltinType::getStringTy()); }
 
 %%
 
