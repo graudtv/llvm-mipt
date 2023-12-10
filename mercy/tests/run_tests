@@ -13,7 +13,7 @@ sub test_case {
   if ($args{skip}) {
     printf $format, "$prefix/$args{name}", "SKIP";
   } else {
-    my $output = qx`echo '$args{source}' | ./mercy -S --emit-llvm | lli`;
+    my $output = qx`echo '$args{source}' | ./mercy --emit-llvm | lli`;
     chomp $output;
     my $ok = ($output eq $args{expect});
     printf $format, "$prefix/$args{name}", ($ok ? "OK" : "FAIL");
