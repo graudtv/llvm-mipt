@@ -36,6 +36,7 @@ BuiltinType BuiltinType::Uint16Ty{BuiltinType::Uint16};
 BuiltinType BuiltinType::Uint32Ty{BuiltinType::Uint32};
 BuiltinType BuiltinType::Uint64Ty{BuiltinType::Uint64};
 std::unordered_map<Type *, ArrayType> ArrayType::ArrayTypes;
+std::list<FunctionType> FunctionType::FuncTypes;
 MetaType MetaType::Instance{};
 
 std::string Type::toString() const {
@@ -94,9 +95,33 @@ llvm::Type *ArrayType::getLLVMType(llvm::LLVMContext &Ctx) const {
   return ElementTy->getLLVMType(Ctx)->getPointerTo();
 }
 
-void MetaType::print(llvm::raw_ostream &Os) const {
-  Os << "MetaType";
+FunctionType *FunctionType::get(Type *Result, llvm::ArrayRef<Type *> Params) {
+  auto eq = [Result, Params](const FunctionType &FT) {
+    return FT.getReturnType() == Result &&
+           llvm::equal(FT.getParamTypes(), Params);
+  };
+  auto It = llvm::find_if(FuncTypes, eq);
+  if (It != FuncTypes.end())
+    return &*It;
+  FuncTypes.push_back(FunctionType{Result, Params});
+  return &FuncTypes.back();
 }
+
+void FunctionType::print(llvm::raw_ostream &Os) const {
+  Os << "function_type(" << *RetTy;
+  for (Type *Ty : ParamTys)
+    Os << ", " << *Ty;
+  Os << ")";
+}
+
+llvm::Type *FunctionType::getLLVMType(llvm::LLVMContext &Ctx) const {
+  std::vector<llvm::Type *> Tys;
+  llvm::transform(ParamTys, std::back_inserter(Tys),
+                  [&Ctx](Type *T) { return T->getLLVMType(Ctx); });
+  return llvm::FunctionType::get(RetTy->getLLVMType(Ctx), Tys, false);
+}
+
+void MetaType::print(llvm::raw_ostream &Os) const { Os << "MetaType"; }
 
 llvm::Type *MetaType::getLLVMType(llvm::LLVMContext &Ctx) const {
   assert(0 && "not implemented");

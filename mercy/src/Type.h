@@ -1,5 +1,6 @@
 #pragma once
 
+#include <list>
 #include <llvm/IR/Type.h>
 #include <llvm/Support/raw_ostream.h>
 #include <unordered_map>
@@ -8,7 +9,7 @@ namespace mercy {
 
 class Type {
 public:
-  enum TypeKind { TK_BuiltinType, TK_FunctionType, TK_ArrayType, TK_MetaType };
+  enum TypeKind { TK_BuiltinType, TK_ArrayType, TK_FunctionType, TK_MetaType };
 
 private:
   TypeKind TK;
@@ -108,6 +109,30 @@ public:
   void print(llvm::raw_ostream &Os) const override;
   llvm::Type *getLLVMType(llvm::LLVMContext &Ctx) const override;
   static bool classof(const Type *T) { return T->isArrayType(); }
+};
+
+class FunctionType : public Type {
+  Type *RetTy;
+  std::vector<Type *> ParamTys;
+
+  // not very efficient storage, but at least it works
+  static std::list<FunctionType> FuncTypes;
+
+  FunctionType(Type *Result, llvm::ArrayRef<Type *> Params)
+      : Type(TK_FunctionType), RetTy(Result),
+        ParamTys(Params.begin(), Params.end()) {}
+
+public:
+  static FunctionType *get(Type *Result, llvm::ArrayRef<Type *> Params);
+
+  Type *getReturnType() const { return RetTy; }
+  Type *getParamType(size_t I) const { return ParamTys[I]; }
+  const auto &getParamTypes() const { return ParamTys; }
+  size_t getParamCount() const { return ParamTys.size(); }
+
+  void print(llvm::raw_ostream &Os) const override;
+  llvm::Type *getLLVMType(llvm::LLVMContext &Ctx) const override;
+  static bool classof(const Type *T) { return T->isFunctionType(); }
 };
 
 /* MetaType is type of all Types */
