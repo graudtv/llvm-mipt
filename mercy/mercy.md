@@ -494,7 +494,7 @@ numeric-literal:
     0x[0-9]+                    ; hex number
     0[0-9]+                     ; octal number
 string-literal:
-    "*"
+    ".*"
 ```
 
 Operators: ```* / % + - << >> < <= > >= == != & ^ | && || !```
@@ -610,6 +610,7 @@ builtin-type
     : "void" | "bool"
     | "int" | "int8" | "int16" | "int32" | "int64"
     | "uint" | "uint8" | "uint16" | "uint32" | "uint64"
+    | "string"
 ```
 
 ### TODO
