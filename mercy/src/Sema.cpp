@@ -187,7 +187,7 @@ void Sema::actOnBinaryOperator(BinaryOperator *BinOp) {
   if (IsLogicalOp && !OperandType->isBool())
     emitError(BinOp, llvm::Twine{"invalid operand types for operator '"} +
                          BinOp->getMnemonic() + "', must be booleans");
-  if (!IsLogicalOp && !OperandType->isInteger())
+  if (!IsLogicalOp && !IsAssignment && !OperandType->isInteger())
     emitError(BinOp, llvm::Twine{"invalid operand types for operator '"} +
                          BinOp->getMnemonic() + "', must be integers");
   if (IsBitOp && !OperandType->isUnsigned()) {

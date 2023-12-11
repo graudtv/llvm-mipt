@@ -61,6 +61,7 @@ llvm::Type *BuiltinType::getLLVMType(llvm::LLVMContext &Ctx) const {
   case Void:
     return llvm::Type::getVoidTy(Ctx);
   case Bool:
+    return llvm::Type::getInt1Ty(Ctx);
   case Int8:
   case Uint8:
     return llvm::Type::getInt8Ty(Ctx);
