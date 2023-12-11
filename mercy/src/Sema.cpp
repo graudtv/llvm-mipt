@@ -1,4 +1,5 @@
 #include "Sema.h"
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/Twine.h>
 #include <llvm/IR/Value.h>
 #include <llvm/Support/ErrorHandling.h>
@@ -248,9 +249,10 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
     if (Id->getName() == "alloca") {
       if (FC->getArgCount() != 2)
         emitError(Callee, "invalid number of arguments in alloca()");
-      assert(llvm::isa<TypeExpr>(FC->getArg(0)) && "indirect types are not implemented");
+      assert(llvm::isa<TypeExpr>(FC->getArg(0)) &&
+             "indirect types are not implemented");
       Type *ElemTy = llvm::cast<TypeExpr>(FC->getArg(0))->getValue();
-      if(!ElemTy->isBuiltinType() || ElemTy == BuiltinType::getVoidTy())
+      if (!ElemTy->isBuiltinType() || ElemTy == BuiltinType::getVoidTy())
         emitError(Callee, "illegal or not implemented array type");
       FC->setType(ArrayType::get(ElemTy));
       return;
@@ -258,12 +260,42 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
     if (Id->getName() == "extern") {
       if (FC->getArgCount() != 2)
         emitError(Callee, "invalid number of arguments in alloca()");
-      if (!llvm::isa<StringLiteral>(FC->getArg(0)))
-        emitError(FC->getArg(0), "symbol name must be constexpr string");
-      if (!llvm::isa<TypeExpr>(FC->getArg(1)))
-        emitError(FC->getArg(1), "invalid symbol type");
-      Type *SymbolType = llvm::cast<TypeExpr>(FC->getArg(1))->getValue();
+      if (!FC->getArg(0)->isConstexpr())
+        emitError(FC->getArg(0), "symbol name must be compile-time expression");
+      if (!FC->getArg(0)->getConstexprValue().isString())
+        emitError(FC->getArg(0), "symbol name must be string");
+      if (!FC->getArg(1)->isConstexpr())
+        emitError(FC->getArg(0), "symbol type must be compile-time expression");
+      Type *SymbolType = FC->getArg(1)->getConstexprValue().asType();
+      if (!llvm::isa<BuiltinType>(SymbolType) &&
+          !llvm::isa<FunctionType>(SymbolType))
+        emitError(FC->getArg(1),
+                  "invalid symbol type, must be builtin or function type");
+      if (auto *FT = llvm::dyn_cast<FunctionType>(SymbolType)) {
+        auto &SymbolName = FC->getArg(0)->getConstexprValue().asString();
+        ExternFunctions.emplace_back(SymbolName, FT);
+        FC->setConstexprValue(
+            GenericValue::makeExternFuncRef(&ExternFunctions.back()));
+      }
       FC->setType(SymbolType);
+      return;
+    }
+    if (Id->getName() == "function_type") {
+      if (FC->getArgCount() == 0) {
+        emitError(
+            Callee,
+            "too few arguments in function_type(), at least one required");
+      }
+      for (Expression *Arg : FC->getArgs())
+        if (!Arg->getType()->isMetaType())
+          emitError(Arg, "argument of function_type() is not a type");
+      llvm::SmallVector<Type *, 8> Values;
+      llvm::transform(
+          FC->getArgs(), std::back_inserter(Values),
+          [](Expression *E) { return E->getConstexprValue().asType(); });
+      FunctionType *FT = FunctionType::get(
+          Values[0], llvm::ArrayRef(&Values[0] + 1, Values.size() - 1));
+      FC->setConstexprValue(GenericValue::makeType(FT));
       return;
     }
     if (Id->getName() == "print") {
@@ -280,7 +312,15 @@ void Sema::actOnFunctionCall(FunctionCall *FC) {
     FC->setType(Instance->getDecl()->getReturnType());
     return;
   };
-  assert(0 && "not implemented: cannot handle call");
+  Callee->sema(*this);
+  if (!Callee->isConstexpr())
+    emitError(Callee, "callee in not constexpr");
+  if (Callee->getConstexprValue().isExternFuncRef()) {
+    auto *F = Callee->getConstexprValue().asExternFuncRef();
+    FC->setType(F->getType()->getReturnType());
+    return;
+  }
+  llvm_unreachable("unhandled function call");
 }
 
 void Sema::actOnArraySubscriptExpr(ArraySubscriptExpr *Expr) {

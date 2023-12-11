@@ -278,54 +278,77 @@ llvm::Value *Codegen::emitFunctionCall(FunctionCall *FC) {
     assert(0 && "unimplemented or illegal cast");
   }
   // TODO: Id may be a function reference, not a function itself
-  assert(llvm::isa<Identifier>(Callee) && "indirect calls not implemented");
-  auto &Id = llvm::cast<Identifier>(Callee)->getName();
-  if (Id == "array") {
-    assert(llvm::isa<ArrayType>(FC->getType()));
-    Type *ElemTy = llvm::cast<ArrayType>(FC->getType())->getElemTy();
-    assert(llvm::isa<BuiltinType>(ElemTy) &&
-           "arrays of non-builtin types are not implemented");
-    llvm::Type *LLVMElemTy = llvm::cast<BuiltinType>(ElemTy)->getLLVMType(Ctx);
-    llvm::Value *Arr = Builder.CreateAlloca(
-        LLVMElemTy, Builder.getInt32(Arguments.size()), "anon_array");
+  if (Identifier *Id = llvm::dyn_cast<Identifier>(Callee)) {
+    if (Id->getName() == "array") {
+      assert(llvm::isa<ArrayType>(FC->getType()));
+      Type *ElemTy = llvm::cast<ArrayType>(FC->getType())->getElemTy();
+      assert(llvm::isa<BuiltinType>(ElemTy) &&
+             "arrays of non-builtin types are not implemented");
+      llvm::Type *LLVMElemTy =
+          llvm::cast<BuiltinType>(ElemTy)->getLLVMType(Ctx);
+      llvm::Value *Arr = Builder.CreateAlloca(
+          LLVMElemTy, Builder.getInt32(Arguments.size()), "anon_array");
 
-    for (size_t I = 0; I < Arguments.size(); ++I) {
-      llvm::Value *Ptr = Builder.CreateConstInBoundsGEP1_32(
-          LLVMElemTy, Arr, I, "anon_array_elem_ptr");
-      Builder.CreateStore(Arguments[I], Ptr);
-    }
-    return Arr;
-  }
-  if (Id == "alloca") {
-    assert(llvm::isa<ArrayType>(FC->getType()));
-    Type *ElemTy = llvm::cast<ArrayType>(FC->getType())->getElemTy();
-    return Builder.CreateAlloca(ElemTy->getLLVMType(Ctx), Arguments[1],
-                                "anon_array");
-  }
-  if (Id == "extern") {
-    auto &SymbolName = llvm::cast<StringLiteral>(FC->getArg(0))->getValue();
-    llvm::Type *SymbolType = FC->getType()->getLLVMType(Ctx);
-    llvm::Value *Addr = M->getOrInsertGlobal(SymbolName, SymbolType);
-    return Builder.CreateLoad(SymbolType, Addr, SymbolName);
-  }
-  if (Id == "print") {
-    assert(FC->getArgCount() == 1 && "invalid number of arguments in print()");
-    Expression *Arg = FC->getArg(0);
-    llvm::FunctionCallee PrintFunc;
-    if (auto *BuiltinTy = llvm::dyn_cast<BuiltinType>(Arg->getType())) {
-      /* cast small integers to int32 / uint32 */
-      if (BuiltinTy->isBool() || BuiltinTy->isInt8() || BuiltinTy->isInt16() ||
-          BuiltinTy->isUint8() || BuiltinTy->isUint16()) {
-        Arguments.front() = Builder.CreateIntCast(
-            Arguments.front(), Builder.getInt32Ty(), BuiltinTy->isSigned());
+      for (size_t I = 0; I < Arguments.size(); ++I) {
+        llvm::Value *Ptr = Builder.CreateConstInBoundsGEP1_32(
+            LLVMElemTy, Arr, I, "anon_array_elem_ptr");
+        Builder.CreateStore(Arguments[I], Ptr);
       }
-      return Builder.CreateCall(getOrInsertPrintFunc(BuiltinTy), Arguments);
-    } else {
-      emitError(Callee, "cannot print argument of non-builtin type");
+      return Arr;
     }
+    if (Id->getName() == "alloca") {
+      assert(llvm::isa<ArrayType>(FC->getType()));
+      Type *ElemTy = llvm::cast<ArrayType>(FC->getType())->getElemTy();
+      return Builder.CreateAlloca(ElemTy->getLLVMType(Ctx), Arguments[1],
+                                  "anon_array");
+    }
+    if (Id->getName() == "extern") {
+      auto &SymbolName = FC->getArg(0)->getConstexprValue().asString();
+      llvm::Type *SymbolType = FC->getType()->getLLVMType(Ctx);
+      /* Extern function */
+      if (FC->isConstexpr()) {
+        M->getOrInsertFunction(SymbolName,
+                               llvm::cast<llvm::FunctionType>(SymbolType));
+        return nullptr;
+      }
+      /* Extern variable */
+      llvm::Value *Addr = M->getOrInsertGlobal(SymbolName, SymbolType);
+      return Builder.CreateLoad(SymbolType, Addr, SymbolName);
+    }
+    if (Id->getName() == "function_type") {
+      /* do nothing, compile-time evaluated by Sema */
+      return nullptr;
+    }
+    if (Id->getName() == "print") {
+      assert(FC->getArgCount() == 1 &&
+             "invalid number of arguments in print()");
+      Expression *Arg = FC->getArg(0);
+      llvm::FunctionCallee PrintFunc;
+      if (auto *BuiltinTy = llvm::dyn_cast<BuiltinType>(Arg->getType())) {
+        /* cast small integers to int32 / uint32 */
+        if (BuiltinTy->isBool() || BuiltinTy->isInt8() ||
+            BuiltinTy->isInt16() || BuiltinTy->isUint8() ||
+            BuiltinTy->isUint16()) {
+          Arguments.front() = Builder.CreateIntCast(
+              Arguments.front(), Builder.getInt32Ty(), BuiltinTy->isSigned());
+        }
+        return Builder.CreateCall(getOrInsertPrintFunc(BuiltinTy), Arguments);
+      } else {
+        emitError(Callee, "cannot print argument of non-builtin type");
+      }
+    }
+    return Builder.CreateCall(getOrInsertFunction(FC->getCalleeFunc()),
+                              Arguments);
   }
-  return Builder.CreateCall(getOrInsertFunction(FC->getCalleeFunc()),
-                            Arguments);
+  assert(Callee->isConstexpr() && "unhandled constexpr in Sema");
+  if (Callee->getConstexprValue().isExternFuncRef()) {
+    auto *F = Callee->getConstexprValue().asExternFuncRef();
+    llvm::FunctionCallee Callee = M->getOrInsertFunction(
+        F->getId(),
+        llvm::cast<llvm::FunctionType>(F->getType()->getLLVMType(Ctx)));
+    return Builder.CreateCall(Callee, Arguments);
+  }
+  llvm_unreachable("unhandled function call");
 }
 
 llvm::Value *Codegen::emitArraySubscriptExpr(ArraySubscriptExpr *Expr) {
@@ -352,8 +375,6 @@ llvm::Value *Codegen::emitVariableDecl(VariableDecl *Decl) {
 
 llvm::Value *Codegen::emitIdentifier(Identifier *Id) {
   return Id->getDeclaration()->getAddr();
-  return Builder.CreateLoad(Id->getType()->getLLVMType(Ctx),
-                            Id->getDeclaration()->getAddr());
 }
 
 llvm::Value *Codegen::emitReturnStmt(ReturnStmt *Ret) {
@@ -371,7 +392,8 @@ void Codegen::run(TranslationUnit *TU, Sema &S) {
     if (VariableDecl *Decl = llvm::dyn_cast<VariableDecl>(N)) {
       M->getOrInsertGlobal(Decl->getId(), Decl->getType()->getLLVMType(Ctx));
       llvm::GlobalVariable *V = M->getNamedGlobal(Decl->getId());
-      V->setInitializer(llvm::PoisonValue::get(Decl->getType()->getLLVMType(Ctx)));
+      V->setInitializer(
+          llvm::PoisonValue::get(Decl->getType()->getLLVMType(Ctx)));
       V->setLinkage(llvm::GlobalValue::PrivateLinkage);
       Decl->setAddr(V);
     }

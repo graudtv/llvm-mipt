@@ -3,6 +3,7 @@
 #include "AST.h"
 #include <llvm/ADT/ArrayRef.h>
 #include <unordered_map>
+#include <list>
 
 namespace mercy {
 
@@ -45,7 +46,10 @@ class Sema {
   std::vector<std::unique_ptr<FunctionDecl>> FunctionDecls;
   /* Storage for all emitted function instantiations */
   std::vector<TemplateInstance *> AllInstances;
+  /* Instance of main() */
   TemplateInstance *EntryPoint = nullptr;
+  /* List of used extern functions */
+  std::list<ExternFunction> ExternFunctions;
 
   Declaration *findDecl(const std::string &Id);
   void insertDecl(Declaration *Decl);

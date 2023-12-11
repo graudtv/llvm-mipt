@@ -1,5 +1,6 @@
 #pragma once
 
+#include "GenericValue.h"
 #include "Type.h"
 #include "misc.h"
 #include <llvm/ADT/STLExtras.h>
@@ -68,9 +69,10 @@ public:
 };
 
 /* Base class for all nodes that have a type.
- * For most expressions type is initialized during semantic analysis */
+ * For most expressions Ty is initialized during semantic analysis */
 class Expression : public ASTNode {
   Type *Ty;
+  GenericValue ConstexprValue;
 
 public:
   Type *getType() const { return Ty; }
@@ -80,6 +82,10 @@ public:
   Expression(NodeKind NK, Type *T = nullptr) : ASTNode(NK), Ty(T) {}
 
   bool isLValue() const;
+
+  void setConstexprValue(GenericValue V) { ConstexprValue = std::move(V); }
+  bool isConstexpr() const { return ConstexprValue; }
+  const GenericValue &getConstexprValue() const { return ConstexprValue; }
 
   static bool classof(const ASTNode *N) {
     NodeKind NK = N->getNodeKind();
@@ -91,13 +97,13 @@ public:
 };
 
 class IntegralLiteral : public Expression {
-  int Value;
-
 public:
   IntegralLiteral(int V)
-      : Expression(NK_IntegralLiteral, BuiltinType::getIntTy()), Value(V) {}
+      : Expression(NK_IntegralLiteral, BuiltinType::getIntTy()) {
+    setConstexprValue(GenericValue::makeInt(V));
+  }
 
-  int getValue() const { return Value; }
+  int getValue() const { return getConstexprValue().asInt(); }
 
   void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
@@ -110,13 +116,13 @@ public:
 };
 
 class StringLiteral : public Expression {
-  std::string Value;
-
 public:
   StringLiteral(const std::string &S)
-      : Expression(NK_StringLiteral, BuiltinType::getStringTy()), Value(S) {}
+      : Expression(NK_StringLiteral, BuiltinType::getStringTy()) {
+    setConstexprValue(GenericValue::makeString(S));
+  }
 
-  const std::string &getValue() { return Value; }
+  const std::string &getValue() const { return getConstexprValue().asString(); }
 
   void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
@@ -129,12 +135,12 @@ public:
 };
 
 class TypeExpr : public Expression {
-  Type *GValue;
-
 public:
-  TypeExpr(Type *Ty) : Expression(NK_TypeExpr, MetaType::get()), GValue(Ty) {}
+  TypeExpr(Type *Ty) : Expression(NK_TypeExpr, MetaType::get()) {
+    setConstexprValue(GenericValue::makeType(Ty));
+  }
 
-  Type *getValue() const { return GValue; }
+  Type *getValue() const { return getConstexprValue().asType(); }
 
   void print(llvm::raw_ostream &Os, unsigned Shift = 0) const override;
   llvm::Value *codegen(Codegen &Gen) override;
@@ -441,7 +447,7 @@ public:
   llvm::Value *codegen(Codegen &Gen) override;
   void sema(Sema &S) override;
   FunctionDecl *clone() const override;
-  Type *getType() override { assert(0 && "not implemented"); }
+  Type *getType() override;
 
   static bool classof(const ASTNode *N) {
     return N->getNodeKind() == NK_FunctionDecl;
@@ -546,7 +552,6 @@ public:
 
 private:
   CallableType CT;
-  llvm::Function *Callee;
 
 public:
   CallableFunction(CallableType T) : CT(T) {}
@@ -554,9 +559,6 @@ public:
   virtual const std::string &getId() const = 0;
 
   CallableType getCallableType() const { return CT; }
-
-  void setCallee(llvm::Function *C) { Callee = C; }
-  llvm::Function *getCallee() { return Callee; }
 };
 
 /* Instance of potentially template FunctionDecl
@@ -584,7 +586,16 @@ public:
 
 /* Emitted by Sema to handle extern-expression-s */
 class ExternFunction : public CallableFunction {
+  std::string FuncName;
+  FunctionType *FT;
+
 public:
+  ExternFunction(std::string Name, FunctionType *T)
+      : CallableFunction(CF_ExternFunction), FuncName(std::move(Name)), FT(T) {}
+
+  const std::string &getId() const override { return FuncName; }
+  FunctionType *getType() const { return FT; }
+
   static bool classof(const CallableFunction *F) {
     return F->getCallableType() == CF_ExternFunction;
   }

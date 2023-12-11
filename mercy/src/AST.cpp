@@ -59,27 +59,27 @@ bool Expression::isLValue() const {
 }
 
 void IntegralLiteral::print(llvm::raw_ostream &Os, unsigned Shift) const {
-  Os << tabulate(Shift) << "IntegralLiteral " << Value << '\n';
+  Os << tabulate(Shift) << "IntegralLiteral " << getValue() << '\n';
 }
 
 IntegralLiteral *IntegralLiteral::clone() const {
-  return new IntegralLiteral(Value);
+  return new IntegralLiteral(getValue());
 }
 
 void StringLiteral::print(llvm::raw_ostream &Os, unsigned Shift) const {
-  Os << tabulate(Shift) << "StringLiteral '" << Value << "'\n";
+  Os << tabulate(Shift) << "StringLiteral '" << getValue() << "'\n";
 }
 
 StringLiteral *StringLiteral::clone() const {
-  return new StringLiteral(Value);
+  return new StringLiteral(getValue());
 }
 
 void TypeExpr::print(llvm::raw_ostream &Os, unsigned Shift) const {
-  Os << tabulate(Shift) << "TypeExpr '" << *GValue << "'\n";
+  Os << tabulate(Shift) << "TypeExpr '" << *getValue() << "'\n";
 }
 
 TypeExpr *TypeExpr::clone() const {
-  return new TypeExpr(GValue);
+  return new TypeExpr(getValue());
 }
 
 const char *BinaryOperator::getMnemonic() const {
@@ -184,6 +184,11 @@ FunctionDecl *FunctionDecl::clone() const {
   std::for_each(std::next(Fragments.begin()), Fragments.end(),
                 [Decl](auto &&F) { Decl->appendFragment(F->clone()); });
   return Decl;
+}
+
+Type *FunctionDecl::getType() {
+  std::vector<Type *> ParamTys(getParamTypes().begin(), getParamTypes().end());
+  return FunctionType::get(getReturnType(), ParamTys);
 }
 
 void FunctionCall::print(llvm::raw_ostream &Os, unsigned Shift) const {
