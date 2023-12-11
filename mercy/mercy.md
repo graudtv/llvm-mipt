@@ -427,7 +427,11 @@ Expression is compile-time expression if one of the following conditions
 is satisfied:
 * Expression is string or numeric literal
 * Expression is builtin-type ("int", "uint", ...)
-* Expression is the result of call to builtin function _function_type()_
+* Expression is identifier which references a function in the current
+  TranslationUnit
+* Expression is the result of a call to builtin function _function_type()_
+* Expression is the result of a call to builtin function _extern()_ when
+  referenced symbol is a function
 
 This set may be extended in the future.
 
