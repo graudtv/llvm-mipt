@@ -53,7 +53,7 @@ void update_neighbour_count(map_t *m) {
 void init_map(map_t *m) {
   for (int i = 0; i < MAP_HEIGHT; ++i)
     for (int j = 0; j < MAP_WIDTH; ++j)
-      m->is_alive[i][j] = (unsigned) sim_rand() % INITIAL_DENSITY_RATIO == 0;
+      m->is_alive[i][j] = (unsigned)sim_rand() % INITIAL_DENSITY_RATIO == 0;
   update_neighbour_count(m);
 }
 
@@ -62,8 +62,7 @@ void update_map(map_t *m) {
     for (int j = 0; j < MAP_WIDTH; ++j) {
       m->is_alive[i][j] =
           (m->is_alive[i][j] && (m->neighbour_count[i][j] == 2)) ||
-          (m->is_alive[i][j] && (m->neighbour_count[i][j] == 3)) ||
-          (!m->is_alive[i][j] && (m->neighbour_count[i][j] == 3));
+          (m->neighbour_count[i][j] == 3);
     }
   update_neighbour_count(m);
 }
