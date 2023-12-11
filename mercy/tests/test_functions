@@ -69,6 +69,17 @@ END
   expect => "-1\n0\n1"
 );
 
+test_case(name => "empty_body", source => <<"END",
+  let maybe_print(x) { print(x); } when x > 0;
+  let maybe_print(x) {} otherwise;
+  let main() {
+    maybe_print(-100);
+    maybe_print(200);
+  };
+END
+  expect => "200"
+);
+
 test_case(name => "multiline_func", source => <<"END",
   let sqlen(x, y) {
     let xx = x * x;

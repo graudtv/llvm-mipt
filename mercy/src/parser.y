@@ -66,6 +66,7 @@ static std::unique_ptr<TranslationUnit> ParserResult;
 
 %nterm<mercy::NodeList *>
   declaration-list
+  optional-statement-list
   statement-list
   expression-list
   optional-function-parameter-list
@@ -88,7 +89,7 @@ declaration-list
 declaration
     : let identifier '=' expression ';' { $$ = new VariableDecl($2, $4, /*IsRef=*/ false); free($2); }
     | let '&' identifier '=' expression ';' { $$ = new VariableDecl($3, $5, /*IsRef=*/ true); free($3); }
-    | let identifier '(' optional-function-parameter-list ')' '{' statement-list '}' optional-domain ';' { $$ = new FunctionFragment($2, $4, $7, $9); free($2); }
+    | let identifier '(' optional-function-parameter-list ')' '{' optional-statement-list '}' optional-domain ';' { $$ = new FunctionFragment($2, $4, $7, $9); free($2); }
     | let identifier '(' optional-function-parameter-list ')' '=' expression optional-domain ';' { $$ = new FunctionFragment($2, $4, new NodeList(new ReturnStmt($7)), $8); free($2); }
 optional-function-parameter-list
     : function-parameter-list
@@ -99,6 +100,9 @@ function-parameter-list
 function-parameter
     : identifier { $$ = new FuncParamDecl($1, /*IsRef=*/ false); free($1); }
     | '&' identifier { $$ = new FuncParamDecl($2, /*IsRef=*/ true); free($2); }
+optional-statement-list
+    : statement-list
+    | %empty { $$ = new NodeList; }
 statement-list
     : statement-list statement { $1->append($2); $$ = $1; }
     | statement { $$ = new NodeList($1); }
