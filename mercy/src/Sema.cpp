@@ -133,7 +133,13 @@ Sema::getOrCreateFunctionInstance(FunctionDecl *FD,
 }
 
 void Sema::actOnFunctionBody(FunctionFragment *Fragment) {
-  // TODO: push scope
+  /* Deduce that return type is void for recursive void functions */
+  bool HasReturnStmt = llvm::any_of(Fragment->getBody(), [](ASTNode *Stmt) {
+    return llvm::isa<ReturnStmt>(Stmt);
+  });
+  if (!HasReturnStmt)
+    Fragment->setReturnType(BuiltinType::getVoidTy());
+
   for (ASTNode *Stmt : Fragment->getBody())
     Stmt->sema(*this);
 
@@ -151,7 +157,8 @@ void Sema::actOnFunctionBody(FunctionFragment *Fragment) {
         RetTy = Ret->getRetType();
     }
   }
-  Fragment->setReturnType(RetTy ? RetTy : BuiltinType::getVoidTy());
+  if (RetTy)
+    Fragment->setReturnType(RetTy);
 }
 
 void Sema::actOnBinaryOperator(BinaryOperator *BinOp) {
