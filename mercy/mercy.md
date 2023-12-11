@@ -125,7 +125,7 @@ declaration
     : "let" identifier "=" expression ";"
     | "let" "&" identifier "=" expression ";"
     | "let" identifier "(" optional-function-parameter-list ")" "=" expression optional-domain ";"
-    | "let" identifier "(" optional-function-parameter-list ")" "{" statement-list "}" optional-domain ";"
+    | "let" identifier "(" optional-function-parameter-list ")" "{" optional-statement-list "}" optional-domain ";"
 optional-function-parameter-list
     : function-parameter-list
     | %empty
@@ -135,6 +135,9 @@ function-parameter-list
 function-parameter
     : identifier
     | "&" identifier
+optional-statement-list
+    : statement-list
+    | %empty
 statement-list
     : statement-list statement
     | statement
@@ -525,7 +528,7 @@ declaration
     : "let" identifier "=" expression ";"
     | "let" "&" identifier "=" expression ";"
     | "let" identifier "(" optional-function-parameter-list ")" "=" expression optional-domain ";"
-    | "let" identifier "(" optional-function-parameter-list ")" "{" statement-list "}" optional-domain ";"
+    | "let" identifier "(" optional-function-parameter-list ")" "{" optional-statement-list "}" optional-domain ";"
 optional-function-parameter-list
     : function-parameter-list
     | %empty
@@ -535,6 +538,9 @@ function-parameter-list
 function-parameter
     : identifier
     | "&" identifier
+optional-statement-list
+    : statement-list
+    | %empty
 statement-list
     : statement-list statement
     | statement
