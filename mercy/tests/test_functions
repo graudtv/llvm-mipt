@@ -1,0 +1,141 @@
+test_case(name => "simple", source => <<"END",
+  let sum(x, y) = x + y;
+  let main() = print(sum(1, 2));
+END
+  expect => "3"
+);
+
+test_case(name => "zero_arg", source => <<"END",
+  let f() = 1000;
+  let main() = print(23 * f());
+END
+  expect => "23000"
+);
+
+test_case(name => "void_ret", source => <<"END",
+  let print1() { print(1); };
+  let print2() = print(2);
+  let main() {
+    print1();
+    print2();
+  };
+END
+  expect => "1\n2"
+);
+
+test_case(name => "multi_instance", source => <<"END",
+  let sum(x, y) = x + y;
+  let main() {
+    print(sum(1,2));
+    print(sum(uint8(3), uint8(4)));
+  };
+END
+  expect => "3\n7"
+);
+
+test_case(name => "nested_call", source => <<"END",
+  let sum(x, y) = x + y;
+  let mul(x, y) = x * y;
+  let main() = print(sum(2, mul(3, 4)));
+END
+  expect => "14"
+);
+
+test_case(name => "nested_use", source => <<"END",
+  let mul(x, y) = x * y;
+  let sqlen(x, y) = mul(x, x) + mul(y, y);
+  let main() = print(sqlen(3, 4));
+END
+  expect => "25"
+);
+
+test_case(name => "domain_simple", source => <<"END",
+  let foo(x) = x + 1 when x > 0;
+  let main() = print(foo(10));
+END
+  expect => "11"
+);
+
+test_case(name => "domain_sign", source => <<"END",
+  let sign(x) = 1 when (x > 0);
+  let sign(x) = -1 when (x < 0);
+  let sign(x) = 0 when (x == 0);
+  let main() {
+    print(sign(-10));
+    print(sign(0));
+    print(sign(10));
+  };
+END
+  expect => "-1\n0\n1"
+);
+
+test_case(name => "empty_body", source => <<"END",
+  let maybe_print(x) { print(x); } when x > 0;
+  let maybe_print(x) {} otherwise;
+  let main() {
+    maybe_print(-100);
+    maybe_print(200);
+  };
+END
+  expect => "200"
+);
+
+test_case(name => "multiline_func", source => <<"END",
+  let sqlen(x, y) {
+    let xx = x * x;
+    let yy = y * y;
+    return xx + yy;
+  };
+  let main() = print(sqlen(3, 4));
+END
+  expect => "25"
+);
+
+test_case(name => "useless_ret", source => <<"END",
+  let sqlen(x, y) {
+    let xx = x * x;
+    let yy = y * y;
+    return xx + yy;
+    let z = x + y + xx + yy;
+    return z;
+  };
+  let main() = print(sqlen(3, 4));
+END
+  expect => "25"
+);
+
+test_case(name => "nested_def", source => <<"END",
+  let func(x, y) {
+    let foo(x) { print(x); };
+    foo(x);
+    foo(y);
+  };
+  let main() = func(10, 20);
+END
+  expect => "10\n20"
+);
+
+test_case(name => "untrivial_scopes", source => <<"END",
+  let x = 0;
+  let f() = x;
+  let g(x) = f();
+  let main() = print(g(1));
+END
+  expect => "0"
+);
+
+test_case(name => "fact", source => <<"END",
+  let fact(n) = 1 when n == 0 || n == 1;
+  let fact(n) = n * fact(n - 1) when n >= 2;
+  let main() = print(fact(5));
+END
+  expect => "120"
+);
+
+test_case(name => "fib", source => <<"END",
+  let fib(n) = 1 when n == 1 || n == 2;
+  let fib(n) = fib(n - 1) + fib(n - 2) when n > 2;
+  let main() = print(fib(10));
+END
+  expect => "55"
+);

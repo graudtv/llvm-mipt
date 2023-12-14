@@ -1,0 +1,51 @@
+test_case(name => "local_usage", source => <<"END",
+  let main() {
+    let x = extern("g_int", int);
+    let y = extern("g_short", int16);
+    print(x);
+    print(y);
+  };
+END
+  csource => "int g_int = 1234; short g_short = 111;",
+  expect => "1234\n111"
+);
+
+test_case(name => "global_usage", source => <<"END",
+  let x = extern("g_int", int);
+  let y = extern("g_short", int16);
+
+  let main() {
+    print(x);
+    print(y);
+  };
+END
+  csource => "int g_int = 1234; short g_short = 111;",
+  expect => "1234\n111"
+);
+
+test_case(name => "extern_function", source => <<"END",
+  let sum(x, y) = extern("_sum", function_type(int, int, int))(x, y);
+
+  let main() {
+    print(sum(10, 20));
+  };
+END
+  csource => "int _sum(int x, int y) { return x + y; }",
+  expect => "30"
+);
+
+test_case(name => "extern_string_func", source => <<"END",
+  let hello() = extern("_hello", function_type(string))();
+
+  let main() {
+    print(hello());
+  };
+END
+  csource => <<"END",
+
+  static const char *hello_str = "Hello, world!";
+  const char *_hello() { return hello_str; }
+END
+  expect => "Hello, world!"
+);
+

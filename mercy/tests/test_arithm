@@ -1,0 +1,286 @@
+test_case(name => "print",
+  source => "let main() = print(10);",
+  expect => "10"
+);
+
+test_case(name => "add",
+  source => "let main() = print(10 + 10 + 10);",
+  expect => "30"
+);
+
+test_case(name => "sub",
+  source => "let main() = print(200 - 10 - 10);",
+  expect => "180"
+);
+
+test_case(name => "umul",
+  source => "let main() = print(10 * 10 * 10);",
+  expect => "1000"
+);
+
+test_case(name => "smul",
+  source => "let main() = print(10 * 10 * -10);",
+  expect => "-1000"
+);
+
+test_case(name => "udiv",
+  source => "let main() = print(128 / 2 / 4);",
+  expect => "16"
+);
+
+test_case(name => "sdiv",
+  source => "let main() = print(128 / 2 / -4);",
+  expect => "-16"
+);
+
+test_case(name => "cmp_slt", source => <<"END",
+  let main() {
+    print(1 < 1);
+    print(1 < -1);
+    print(-2 < -1);
+    print(-2 < -1);
+  };
+END
+  expect => "0\n0\n1\n1"
+);
+
+test_case(name => "cmp_sgt", source => <<"END",
+  let main() {
+    print(1 > 1);
+    print(-1 > 1);
+    print(2 > 1);
+    print(-1 > -2);
+  };
+END
+  expect => "0\n0\n1\n1"
+);
+
+test_case(name => "cmp_sle", source => <<"END",
+  let main() {
+    print(1 <= 1);
+    print(1 <= 2);
+    print(-1 <= -2);
+    print(-2 <= -2);
+  };
+END
+  expect => "1\n1\n0\n1"
+);
+
+test_case(name => "cmp_sge", source => <<"END",
+  let main() {
+    print(1 >= 1);
+    print(2 >= 1);
+    print(-2 >= -1);
+    print(-2 >= -2);
+  };
+END
+  expect => "1\n1\n0\n1"
+);
+
+test_case(name => "cmp_ult", source => <<"END",
+  let main() {
+    print(uint(1) < uint(1));
+    print(uint(1) < uint(-1));
+    print(uint(1) < uint(2));
+    print(uint(-2) < uint(-1));
+  };
+END
+  expect => "0\n1\n1\n1"
+);
+
+test_case(name => "cmp_ugt", source => <<"END",
+  let main() {
+    print(uint(1) > uint(1));
+    print(uint(-1) > uint(1));
+    print(uint(2) > uint(1));
+    print(uint(-1) > uint(-2));
+  };
+END
+  expect => "0\n1\n1\n1"
+);
+
+test_case(name => "cmp_ule", source => <<"END",
+  let main() {
+    print(uint(1) <= uint(1));
+    print(uint(1) <= uint(2));
+    print(uint(1) <= uint(0));
+    print(uint(1) <= uint(-1));
+  };
+END
+  expect => "1\n1\n0\n1"
+);
+
+test_case(name => "cmp_uge", source => <<"END",
+  let main() {
+    print(uint(1) >= uint(1));
+    print(uint(2) >= uint(1));
+    print(uint(0) >= uint(1));
+    print(uint(-1) >= uint(1));
+  };
+END
+  expect => "1\n1\n0\n1"
+);
+
+test_case(name => "shift_left",
+  source => "let main() = print(1 << 10);",
+  expect => "1024"
+);
+
+test_case(name => "shift_right",
+  source => "let main() = print(1024 >> 4);",
+  expect => "64"
+);
+
+test_case(name => "arithm_shift_right",
+  source => "let main() = print(-1 >> 4);",
+  expect => "-1"
+);
+
+test_case(name => "logical_shift_right",
+  source => "let main() = print(uint16(-1) >> uint16(4));",
+  expect => 0xfff
+);
+
+test_case(name => "eq", source => <<"END",
+  let main() {
+    print(1 == 1);
+    print(-1 == -1);
+    print(uint(-1) == uint(-1));
+    print(1 == 2);
+  };
+END
+  expect => "1\n1\n1\n0"
+);
+
+test_case(name => "neq", source => <<"END",
+  let main() {
+    print(1 != 1);
+    print(-1 != -1);
+    print(uint(-1) != uint(-1));
+    print(1 != 2);
+  };
+END
+  expect => "0\n0\n0\n1"
+);
+
+test_case(name => "not", source => <<"END",
+  let main() {
+    print(!(1 < 1));
+    print(!(1 < 2));
+  };
+END
+  expect => "1\n0"
+);
+
+test_case(name => "or",
+  source => "let main() = print(uint(0xff00) | uint(0xf00f));",
+  expect => 0xff0f
+);
+
+test_case(name => "xor",
+  source => "let main() = print(uint(0xff00) ^ uint(0xf00f));",
+  expect => 0xf0f
+);
+
+test_case(name => "and",
+  source => "let main() = print(uint(0xff00) & uint(0xf00f));",
+  expect => 0xf000
+);
+
+test_case(name => "logical_or", source => <<"END",
+  let main() {
+    print(1 == 1 || 1 == 0);
+    print(1 == 0 || 1 == 2);
+  };
+END
+  expect => "1\n0"
+);
+
+test_case(name => "logical_and", source => <<"END",
+  let main() {
+    print(1 == 1 && 1 == 0);
+    print(1 == 1 && 2 == 2);
+  };
+END
+  expect => "0\n1"
+);
+
+test_case(name => "arithm_expr",
+  source => "let main() = print(2 + 2 * 2);",
+  expect => "6"
+);
+
+test_case(name => "cast_uint8",
+  source => "let main() = print(uint8(0xdeadbeaf));",
+  expect => 0xaf
+);
+
+test_case(name => "cast_uint16",
+  source => "let main() = print(uint16(0xdeadbeaf));",
+  expect => 0xbeaf
+);
+
+test_case(name => "cast_uint_twice",
+  source => "let main() = print(uint32(uint64(0xdeadbeaf)));",
+  expect => 0xdeadbeaf
+);
+
+test_case(name => "cast_int8",
+  source => "let main() = print(int8(0xffffffff));",
+  expect => "-1"
+);
+
+test_case(name => "cast_int16",
+  source => "let main() = print(int16(0xffffffff));",
+  expect => "-1"
+);
+
+test_case(name => "cast_int_twice",
+  source => "let main() = print(int32(int64(0xffffffff)));",
+  expect => "-1"
+);
+
+test_case(name => "local_ids", source => <<"END",
+  let main() {
+    let x = 5;
+    let y = 7;
+    print(x * y - x + y);
+  };
+END
+  expect => "37"
+);
+
+test_case(name => "assignment", source => <<"END",
+  let main() {
+    let x = 5;
+    let y = 7;
+    let tmp = x;
+    x = y;
+    y = tmp;
+    print(x);
+    print(y);
+  };
+END
+  expect => "7\n5"
+);
+
+test_case(name => "multiassignment", source => <<"END",
+  let main() {
+    let x = 0; let y = 0; let z = 0;
+    x = y = z = 100;
+    print(x);
+    print(y);
+    print(z);
+  };
+END
+  expect => "100\n100\n100"
+);
+
+test_case(name => "string", source => <<"END",
+  let main() {
+    let str = "Hello, world!";
+    print(str);
+  };
+END
+  expect => "Hello, world!"
+);

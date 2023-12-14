@@ -1,0 +1,100 @@
+let rgb(r, g, b) = (uint32(r) << uint32(24)) | (uint32(g) << uint32(16)) |
+                   (uint32(b) << uint32(8)) | (uint32(255));
+
+let MAP_WIDTH = 200;
+let MAP_HEIGHT = 100;
+let MAP_SIZE = MAP_WIDTH * MAP_HEIGHT;
+
+let PIXEL_SHAPE = 32;
+let INITIAL_DENSITY_RATIO = 5;
+let BACKGROUND_COLOR = rgb(128, 128, 128);
+let ENABLE_STATIC_MODE = 0;
+
+let is_alive = alloca(bool, MAP_WIDTH * MAP_HEIGHT);
+let ncount = alloca(int, MAP_WIDTH * MAP_HEIGHT);
+
+let color_scheme = array(
+  rgb(240, 223, 36),
+  rgb(98, 240, 36),
+  rgb(36, 240, 214),
+  rgb(36, 194, 240),
+  rgb(36, 50, 240),
+  rgb(194, 236, 240),
+  rgb(240, 36, 28),
+  rgb(240, 60, 36),
+  rgb(240, 122, 36)
+);
+
+let set_pixel(x, y, color, shape) =
+  extern("sim_set_pixel", function_type(void, uint32, uint32, uint32, uint32))(x, y, color, shape);
+let clear(color) = extern("sim_clear", function_type(void, uint32))(color);
+let display() = extern("sim_display", function_type(void))();
+let rand() = extern("sim_rand", function_type(int32))();
+
+let main() {
+  init_map();
+  main_loop();
+};
+
+let main_loop() {
+  clear(BACKGROUND_COLOR);
+  draw_map();
+  display();
+  update_map();
+  main_loop();
+};
+
+let draw_map() = _draw_map(0);
+let update_ncount() = _update_ncount(0);
+let init_map() { _init_map(0); update_ncount(); };
+let update_map() { _update_map(0); update_ncount(); };
+
+
+let _init_map(idx) {
+  is_alive[idx] = rand() % INITIAL_DENSITY_RATIO == 0;
+  _init_map(idx + 1);
+} when idx < MAP_SIZE;
+
+let _init_map(idx) {} otherwise;
+
+
+let _update_ncount(idx) {
+  let i = idx / MAP_WIDTH;
+  let j = idx % MAP_WIDTH;
+  let left = (j + MAP_WIDTH - 1) % MAP_WIDTH;
+  let right = (j + 1) % MAP_WIDTH;
+  let top = (i + MAP_HEIGHT - 1) % MAP_HEIGHT;
+  let bottom = (i + 1) % MAP_HEIGHT;
+  let bool_to_int(bool_val) = 1 when bool_val;
+  let bool_to_int(bool_val) = 0 otherwise;
+  let cell(i, j) = bool_to_int(is_alive[i * MAP_WIDTH + j]);
+
+  ncount[idx] = cell(top, left) + cell(top, j) + cell(top, right) +
+                cell(i, left) + cell(i, right) + cell(bottom, left) +
+                cell(bottom, j) + cell(bottom, right);
+  _update_ncount(idx + 1);
+} when idx < MAP_SIZE;
+
+let _update_ncount(idx) {} otherwise;
+
+
+let _draw_map(idx) {
+  let color = color_scheme[ncount[idx]];
+  let shape = PIXEL_SHAPE;
+  set_pixel(idx % MAP_WIDTH, idx / MAP_WIDTH, color, shape);
+  _draw_map(idx + 1);
+} when idx < MAP_SIZE && is_alive[idx];
+
+let _draw_map(idx) {
+  _draw_map(idx + 1);
+} when idx < MAP_SIZE && !is_alive[idx];
+
+let _draw_map(idx) {} otherwise;
+
+
+let _update_map(idx) {
+  is_alive[idx] = (is_alive[idx] && ncount[idx] == 2) || ncount[idx] == 3;
+  _update_map(idx + 1);
+} when idx < MAP_SIZE;
+
+let _update_map(idx) {} otherwise;

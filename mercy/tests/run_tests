@@ -1,0 +1,61 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use File::Basename;
+use File::Temp "tempfile";
+
+my $err_count = 0;
+my $prefix = "";
+my @open_files;
+
+sub create_object_file {
+  my (undef, $filename) = tempfile(SUFFIX=>".o");
+  push @open_files, $filename;
+  return $filename;
+}
+
+sub compile_c {
+  my $code = shift;
+  my $obj = create_object_file;
+  system("echo '$code' | clang -x c -c -o $obj -") == 0 or die "failed to compile C code";
+  return $obj;
+}
+
+sub compile_mercy {
+  my $code = shift;
+  my $obj = create_object_file;
+  system("echo '$code' | ./mercy -c -o $obj -") == 0 or die "failed to compile mercy code";
+  return $obj;
+}
+
+sub test_case {
+  my %args = @_;
+  my $format = "%-40s %s\n";
+  if ($args{skip}) {
+    printf $format, "$prefix/$args{name}", "SKIP";
+    return;
+  }
+  my $output;
+  if ($args{csource}) {
+    my $mercy_obj = compile_mercy($args{source});
+    my $c_obj = compile_c($args{csource});
+    $output = qx`clang $mercy_obj $c_obj && ./a.out`;
+  } else {
+    $output = qx`echo '$args{source}' | ./mercy --emit-llvm | lli`;
+  }
+  chomp $output;
+  my $ok = ($output eq $args{expect});
+  printf $format, "$prefix/$args{name}", ($ok ? "OK" : "FAIL");
+  ++$err_count unless $ok;
+}
+
+my @tests = glob(dirname($0) . "/test_*");
+for my $test (@tests) {
+  $prefix = basename $test;
+  do $test or die "failed to run tests: $@";
+}
+
+unlink $_ foreach @open_files;
+
+exit($err_count ? 1 : 0);
